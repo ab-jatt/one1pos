@@ -1,0 +1,214 @@
+<step title="Incoming Request" date="2026-03-02T19:30:23.899" instance="5b2008" url="/api/publish?type=zip&amp;async=False" method="POST" type="request" pid="833,1,5" Accept="*/*" Host="one1pos-api.scm.azurewebsites.net" User-Agent="AZURECLI/2.83.0 (MSI)" Accept-Encoding="gzip, deflate" Authorization="Bea..." Cache-Control="no-cache" Content-Type="application/octet-stream" Cookie="ARRAffinity=5b2008cde0b92d9a8a6da36c610692f13c692ed1ce73853cff06cc5bb1681877; ARRAffinitySameSite=5b2008cde0b92d9a8a6da36c610692f13c692ed1ce73853cff06cc5bb1681877" Content-Length="983985" x-ms-client-request-id="3273ab0a-166e-11f1-9c51-5cb47ee4698d" x-ms-artifact-checksum="ea10af40d7f7709d6d5f16a1c2d96c03e812a9783e23d66558e82f0fbbc7b546" X-ARR-LOG-ID="3273ab0a-166e-11f1-9c51-5cb47ee4698d" CLIENT-IP="154.208.55.126:49900" X-SITE-DEPLOYMENT-ID="one1pos-api" WAS-DEFAULT-HOSTNAME="one1pos-api.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/publish?type=zip&amp;async=False" X-Client-IP="154.208.55.126" X-Client-Port="49900" >
+  <step title="OneDeploy" date="2026-03-02T19:30:23.954" >
+    <step title="None repository commit" date="2026-03-02T19:30:23.964" >
+      <step title="Commit id: c93303ea-d30f-4a74-a074-68021d396aec" date="2026-03-02T19:30:23.966" Message="N/A" AuthorName="N/A" AuthorEmail="N/A" /><!-- duration: 1ms -->
+    </step><!-- duration: 5ms -->
+    <step title="Starting PushDeployAsync" date="2026-03-02T19:30:23.970" /><!-- duration: 1ms -->
+    <step title="Removing _del_node_modules symlink" date="2026-03-02T19:30:24.045" >
+      <step title="Writing artifact to /tmp/zipdeploy/ff8a28ea-28e3-43d3-b18e-69ca4952e594.zip" date="2026-03-02T19:30:24.126" >
+        <step title="Writing multipart request body to /tmp/zipdeploy/ff8a28ea-28e3-43d3-b18e-69ca4952e594.zip" date="2026-03-02T19:30:24.129" /><!-- duration: 7ms -->
+      </step><!-- duration: 1139ms -->
+      <step title="Removing previous build artifact&apos;s manifest file" date="2026-03-02T19:30:25.273" >
+        <step title="Attempting to fetch target branch HEAD" date="2026-03-02T19:30:25.289" /><!-- duration: 1ms -->
+        <step title="Acquiring Deployment Lock" date="2026-03-02T19:30:25.298" /><!-- duration: 1ms -->
+        <step title="Acquired Deployment Lock" date="2026-03-02T19:30:25.460" /><!-- duration: 1ms -->
+        <step title="Performing fetch based deployment" date="2026-03-02T19:30:25.465" >
+          <step title="Creating temporary deployment" date="2026-03-02T19:30:25.478" /><!-- duration: 63ms -->
+          <step title="Releasing Deployment Lock" date="2026-03-02T19:30:26.684" /><!-- duration: 9ms -->
+          <step title="Cleaning up temp folders from previous zip deployments and extracting pushed zip file /tmp/zipdeploy/ff8a28ea-28e3-43d3-b18e-69ca4952e594.zip (0.94 MB) to /tmp/zipdeploy/extracted" date="2026-03-02T19:30:26.736" >
+            <step title="ChmodRecursive Process exited with total time taken in ms: 50" date="2026-03-02T19:30:27.086" /><!-- duration: 2ms -->
+          </step><!-- duration: 360ms -->
+          <step title="None repository commit" date="2026-03-02T19:30:27.106" >
+            <step title="Commit id: c93303ea-d30f-4a74-a074-68021d396aec" date="2026-03-02T19:30:27.124" Message="OneDeploy" AuthorName="N/A" AuthorEmail="N/A" /><!-- duration: 3ms -->
+          </step><!-- duration: 22ms -->
+          <step title="Deployment timer started" date="2026-03-02T19:30:29.137" >
+            <step title="DeploymentManager.Deploy(id:c93303ea-d30f-4a74-a074-68021d396aec)" date="2026-03-02T19:30:29.139" >
+              <step title="Collecting changeset information" date="2026-03-02T19:30:29.161" /><!-- duration: 88ms -->
+              <step title="Updating submodules" date="2026-03-02T19:30:29.251" /><!-- duration: 1201ms -->
+              <step title="Determining deployment builder" date="2026-03-02T19:30:30.740" >
+                <step title="Builder is OryxBuilder" date="2026-03-02T19:30:30.761" /><!-- duration: 1ms -->
+              </step><!-- duration: 30ms -->
+              <step title="PreDeployment: context.CleanOutputPath False" date="2026-03-02T19:30:30.828" >
+                <step title="PreDeployment: context.OutputPath /home/site/wwwroot" date="2026-03-02T19:30:30.964" >
+                  <step title="Building" date="2026-03-02T19:30:31.130" >
+                    <step title="Executing external process" date="2026-03-02T19:30:31.484" type="process" path="bash" arguments="-c &quot;oryx build /tmp/zipdeploy/extracted -o /home/site/wwwroot --platform nodejs --platform-version 20 -p virtualenv_name= --log-file /tmp/build-debug.log  -i /tmp/8de78922a8f33cd -p compress_node_modules=tar-gz | tee /tmp/oryx-build.log ; exit $PIPESTATUS &quot;" >
+                      <step title="Process dump" date="2026-03-02T19:32:27.700" exitCode="1" type="processOutput" /><!-- duration: 29ms -->
+                    </step><!-- duration: 116295ms -->
+                    <step title="Error occurred" date="2026-03-02T19:32:28.233" type="error" text="npm warn deprecated node-domexception@1.0.0: Use your platform&apos;s native DOMException instead
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+Error: Could not find Prisma Schema that is required for this command.
+You can either provide it with `--schema` argument, set it as `prisma.schema` in your package.json or put it into the default location.
+Checked following paths:
+
+schema.prisma: file not found
+prisma/schema.prisma: file not found
+prisma/schema: directory not found
+
+See also https://pris.ly/d/prisma-schema-location
+npm error code 1
+npm error path /tmp/8de78922a8f33cd
+npm error command failed
+npm error command sh -c prisma generate
+npm error A complete log of this run can be found in: /home/.npm/_logs/2026-03-02T19_30_57_448Z-debug-0.log
+/bin/bash -c &quot;oryx build /tmp/zipdeploy/extracted -o /home/site/wwwroot --platform nodejs --platform-version 20 -p virtualenv_name= --log-file /tmp/build-debug.log  -i /tmp/8de78922a8f33cd -p compress_node_modules=tar-gz | tee /tmp/oryx-build.log ; exit $PIPESTATUS &quot;" stackTrace="   at Kudu.Core.Infrastructure.Executable.ExecuteInternal(ITracer tracer, Func`2 onWriteOutput, Func`2 onWriteError, CancellationToken token, Encoding encoding, String arguments, Object[] args) in /tmp/KuduLite/Kudu.Core/Infrastructure/Executable.cs:line 239
+   at Kudu.Core.Infrastructure.Executable.ExecuteWithProgressWriter(ILogger logger, ITracer tracer, CancellationToken token, String arguments, Object[] args) in /tmp/KuduLite/Kudu.Core/Infrastructure/Executable.cs:line 118
+   at Kudu.Core.Deployment.Generator.ExternalCommandBuilder.RunCommand(DeploymentContext context, String command, Boolean ignoreManifest, CancellationToken token, String message) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/ExternalCommandBuilder.cs:line 135" /><!-- duration: 28ms -->
+                    <step title="Error occurred" date="2026-03-02T19:32:28.343" type="error" text="npm warn deprecated node-domexception@1.0.0: Use your platform&apos;s native DOMException instead
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+Error: Could not find Prisma Schema that is required for this command.
+You can either provide it with `--schema` argument, set it as `prisma.schema` in your package.json or put it into the default location.
+Checked following paths:
+
+schema.prisma: file not found
+prisma/schema.prisma: file not found
+prisma/schema: directory not found
+
+See also https://pris.ly/d/prisma-schema-location
+npm error code 1
+npm error path /tmp/8de78922a8f33cd
+npm error command failed
+npm error command sh -c prisma generate
+npm error A complete log of this run can be found in: /home/.npm/_logs/2026-03-02T19_30_57_448Z-debug-0.log
+/bin/bash -c &quot;oryx build /tmp/zipdeploy/extracted -o /home/site/wwwroot --platform nodejs --platform-version 20 -p virtualenv_name= --log-file /tmp/build-debug.log  -i /tmp/8de78922a8f33cd -p compress_node_modules=tar-gz | tee /tmp/oryx-build.log ; exit $PIPESTATUS &quot;" stackTrace="   at Kudu.Core.Infrastructure.Executable.ExecuteInternal(ITracer tracer, Func`2 onWriteOutput, Func`2 onWriteError, CancellationToken token, Encoding encoding, String arguments, Object[] args) in /tmp/KuduLite/Kudu.Core/Infrastructure/Executable.cs:line 239
+   at Kudu.Core.Infrastructure.Executable.ExecuteWithProgressWriter(ILogger logger, ITracer tracer, CancellationToken token, String arguments, Object[] args) in /tmp/KuduLite/Kudu.Core/Infrastructure/Executable.cs:line 118
+   at Kudu.Core.Deployment.Generator.ExternalCommandBuilder.RunCommand(DeploymentContext context, String command, Boolean ignoreManifest, CancellationToken token, String message) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/ExternalCommandBuilder.cs:line 135
+   at Kudu.Core.Deployment.Generator.OryxBuilder.RunBuildCommand(IOryxArguments args, DeploymentContext context, CancellationToken token) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/OryxBuilder.cs:line 295
+   at Kudu.Core.Deployment.Generator.OryxBuilder.Build(DeploymentContext context, CancellationToken token) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/OryxBuilder.cs:line 136
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 771" /><!-- duration: 11ms -->
+                    <step title="Using GenericDeploymentLogParser" date="2026-03-02T19:32:28.978" /><!-- duration: 9ms -->
+                    <step title="Purge deployment items" date="2026-03-02T19:32:32.608" >
+                      <step title="Remove temp-f1e2, Pending, received at 03/02/2026 19:30:25" date="2026-03-02T19:32:32.729" /><!-- duration: 9ms -->
+                      <step title="Remove temp-20ca, Pending, received at 03/02/2026 19:26:05" date="2026-03-02T19:32:32.870" /><!-- duration: 9ms -->
+                      <step title="Remove 95c340d6-, Failed, received at 03/02/2026 19:14:39" date="2026-03-02T19:32:33.029" /><!-- duration: 1ms -->
+                    </step><!-- duration: 431ms -->
+                  </step><!-- duration: 121910ms -->
+                </step><!-- duration: 122086ms -->
+                <step title="Error occurred" date="2026-03-02T19:32:33.062" type="error" text="npm warn deprecated node-domexception@1.0.0: Use your platform&apos;s native DOMException instead
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+Error: Could not find Prisma Schema that is required for this command.
+You can either provide it with `--schema` argument, set it as `prisma.schema` in your package.json or put it into the default location.
+Checked following paths:
+
+schema.prisma: file not found
+prisma/schema.prisma: file not found
+prisma/schema: directory not found
+
+See also https://pris.ly/d/prisma-schema-location
+npm error code 1
+npm error path /tmp/8de78922a8f33cd
+npm error command failed
+npm error command sh -c prisma generate
+npm error A complete log of this run can be found in: /home/.npm/_logs/2026-03-02T19_30_57_448Z-debug-0.log
+/bin/bash -c &quot;oryx build /tmp/zipdeploy/extracted -o /home/site/wwwroot --platform nodejs --platform-version 20 -p virtualenv_name= --log-file /tmp/build-debug.log  -i /tmp/8de78922a8f33cd -p compress_node_modules=tar-gz | tee /tmp/oryx-build.log ; exit $PIPESTATUS &quot;" stackTrace="   at Kudu.Core.Infrastructure.Executable.ExecuteInternal(ITracer tracer, Func`2 onWriteOutput, Func`2 onWriteError, CancellationToken token, Encoding encoding, String arguments, Object[] args) in /tmp/KuduLite/Kudu.Core/Infrastructure/Executable.cs:line 239
+   at Kudu.Core.Infrastructure.Executable.ExecuteWithProgressWriter(ILogger logger, ITracer tracer, CancellationToken token, String arguments, Object[] args) in /tmp/KuduLite/Kudu.Core/Infrastructure/Executable.cs:line 118
+   at Kudu.Core.Deployment.Generator.ExternalCommandBuilder.RunCommand(DeploymentContext context, String command, Boolean ignoreManifest, CancellationToken token, String message) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/ExternalCommandBuilder.cs:line 135
+   at Kudu.Core.Deployment.Generator.OryxBuilder.RunBuildCommand(IOryxArguments args, DeploymentContext context, CancellationToken token) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/OryxBuilder.cs:line 295
+   at Kudu.Core.Deployment.Generator.OryxBuilder.Build(DeploymentContext context, CancellationToken token) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/OryxBuilder.cs:line 136
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 771
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 840" /><!-- duration: 9ms -->
+                <step title="Cleaning up temp files" date="2026-03-02T19:32:33.182" /><!-- duration: 16954ms -->
+                <step title="Cleaning up temp files" date="2026-03-02T19:32:50.145" /><!-- duration: 540ms -->
+                <step title="Error occurred" date="2026-03-02T19:32:50.795" type="error" text="npm warn deprecated node-domexception@1.0.0: Use your platform&apos;s native DOMException instead
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+Error: Could not find Prisma Schema that is required for this command.
+You can either provide it with `--schema` argument, set it as `prisma.schema` in your package.json or put it into the default location.
+Checked following paths:
+
+schema.prisma: file not found
+prisma/schema.prisma: file not found
+prisma/schema: directory not found
+
+See also https://pris.ly/d/prisma-schema-location
+npm error code 1
+npm error path /tmp/8de78922a8f33cd
+npm error command failed
+npm error command sh -c prisma generate
+npm error A complete log of this run can be found in: /home/.npm/_logs/2026-03-02T19_30_57_448Z-debug-0.log
+/bin/bash -c &quot;oryx build /tmp/zipdeploy/extracted -o /home/site/wwwroot --platform nodejs --platform-version 20 -p virtualenv_name= --log-file /tmp/build-debug.log  -i /tmp/8de78922a8f33cd -p compress_node_modules=tar-gz | tee /tmp/oryx-build.log ; exit $PIPESTATUS &quot;" stackTrace="   at Kudu.Core.Infrastructure.Executable.ExecuteInternal(ITracer tracer, Func`2 onWriteOutput, Func`2 onWriteError, CancellationToken token, Encoding encoding, String arguments, Object[] args) in /tmp/KuduLite/Kudu.Core/Infrastructure/Executable.cs:line 239
+   at Kudu.Core.Infrastructure.Executable.ExecuteWithProgressWriter(ILogger logger, ITracer tracer, CancellationToken token, String arguments, Object[] args) in /tmp/KuduLite/Kudu.Core/Infrastructure/Executable.cs:line 118
+   at Kudu.Core.Deployment.Generator.ExternalCommandBuilder.RunCommand(DeploymentContext context, String command, Boolean ignoreManifest, CancellationToken token, String message) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/ExternalCommandBuilder.cs:line 135
+   at Kudu.Core.Deployment.Generator.OryxBuilder.RunBuildCommand(IOryxArguments args, DeploymentContext context, CancellationToken token) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/OryxBuilder.cs:line 295
+   at Kudu.Core.Deployment.Generator.OryxBuilder.Build(DeploymentContext context, CancellationToken token) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/OryxBuilder.cs:line 136
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 771
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 840
+   at Kudu.Core.Deployment.DeploymentManager.DeployAsync(IRepository repository, ChangeSet changeSet, String deployer, Boolean clean, DeploymentInfoBase deploymentInfo, Boolean needFileUpdate, Boolean fullBuildByDefault) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 266" /><!-- duration: 2ms -->
+              </step><!-- duration: 139978ms -->
+              <step title="Reloading status file with latest updates" date="2026-03-02T19:32:50.868" >
+                <step title="WebHooksManager.PublishEventAsync: PostDeployment" date="2026-03-02T19:32:50.877" /><!-- duration: 259ms -->
+              </step><!-- duration: 269ms -->
+              <step title="Error occurred" date="2026-03-02T19:32:51.140" type="error" text="npm warn deprecated node-domexception@1.0.0: Use your platform&apos;s native DOMException instead
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+Error: Could not find Prisma Schema that is required for this command.
+You can either provide it with `--schema` argument, set it as `prisma.schema` in your package.json or put it into the default location.
+Checked following paths:
+
+schema.prisma: file not found
+prisma/schema.prisma: file not found
+prisma/schema: directory not found
+
+See also https://pris.ly/d/prisma-schema-location
+npm error code 1
+npm error path /tmp/8de78922a8f33cd
+npm error command failed
+npm error command sh -c prisma generate
+npm error A complete log of this run can be found in: /home/.npm/_logs/2026-03-02T19_30_57_448Z-debug-0.log
+/bin/bash -c &quot;oryx build /tmp/zipdeploy/extracted -o /home/site/wwwroot --platform nodejs --platform-version 20 -p virtualenv_name= --log-file /tmp/build-debug.log  -i /tmp/8de78922a8f33cd -p compress_node_modules=tar-gz | tee /tmp/oryx-build.log ; exit $PIPESTATUS &quot;" stackTrace="   at Kudu.Core.Infrastructure.Executable.ExecuteInternal(ITracer tracer, Func`2 onWriteOutput, Func`2 onWriteError, CancellationToken token, Encoding encoding, String arguments, Object[] args) in /tmp/KuduLite/Kudu.Core/Infrastructure/Executable.cs:line 239
+   at Kudu.Core.Infrastructure.Executable.ExecuteWithProgressWriter(ILogger logger, ITracer tracer, CancellationToken token, String arguments, Object[] args) in /tmp/KuduLite/Kudu.Core/Infrastructure/Executable.cs:line 118
+   at Kudu.Core.Deployment.Generator.ExternalCommandBuilder.RunCommand(DeploymentContext context, String command, Boolean ignoreManifest, CancellationToken token, String message) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/ExternalCommandBuilder.cs:line 135
+   at Kudu.Core.Deployment.Generator.OryxBuilder.RunBuildCommand(IOryxArguments args, DeploymentContext context, CancellationToken token) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/OryxBuilder.cs:line 295
+   at Kudu.Core.Deployment.Generator.OryxBuilder.Build(DeploymentContext context, CancellationToken token) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/OryxBuilder.cs:line 136
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 771
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 840
+   at Kudu.Core.Deployment.DeploymentManager.DeployAsync(IRepository repository, ChangeSet changeSet, String deployer, Boolean clean, DeploymentInfoBase deploymentInfo, Boolean needFileUpdate, Boolean fullBuildByDefault) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 266" /><!-- duration: 7ms -->
+              <step title="Could not find status file to mark the deployment failed" date="2026-03-02T19:32:51.208" /><!-- duration: 2ms -->
+            </step><!-- duration: 142073ms -->
+          </step><!-- duration: 142093ms -->
+          <step title="Error occurred" date="2026-03-02T19:32:51.338" type="error" text="Deployment failed" stackTrace="   at Kudu.Core.Deployment.DeploymentManager.DeployAsync(IRepository repository, ChangeSet changeSet, String deployer, Boolean clean, DeploymentInfoBase deploymentInfo, Boolean needFileUpdate, Boolean fullBuildByDefault) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 307
+   at Kudu.Core.Deployment.FetchDeploymentManager.PerformDeployment(DeploymentInfoBase deploymentInfo, IDisposable tempDeployment, ChangeSet tempChangeSet, DeployStatusApiResult updateStatusObj) in /tmp/KuduLite/Kudu.Core/Deployment/FetchDeploymentManager.cs:line 230
+   at Kudu.Core.Deployment.FetchDeploymentManager.&lt;&gt;c__DisplayClass17_0.&lt;&lt;FetchDeploy&gt;b__0&gt;d.MoveNext() in /tmp/KuduLite/Kudu.Core/Deployment/FetchDeploymentManager.cs:line 131
+--- End of stack trace from previous location ---
+   at Kudu.Core.Deployment.FetchDeploymentManager.FetchDeploy(DeploymentInfoBase deployInfo, Boolean asyncRequested, Uri requestUri, String targetBranch) in /tmp/KuduLite/Kudu.Core/Deployment/FetchDeploymentManager.cs:line 124
+   at Kudu.Services.Deployment.PushDeploymentController.PushDeployAsync(ArtifactDeploymentInfo deploymentInfo, Boolean isAsync, HttpContext context, JObject requestJson) in /tmp/KuduLite/Kudu.Services/Deployment/PushDeploymentController.cs:line 802
+   at Kudu.Services.Deployment.PushDeploymentController.OneDeploy(String type, Boolean async, String path, Nullable`1 restart, Nullable`1 clean, Boolean ignoreStack, Boolean trackDeploymentProgress, Boolean trackStatus, Boolean reset) in /tmp/KuduLite/Kudu.Services/Deployment/PushDeploymentController.cs:line 624
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.TaskOfIActionResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.&lt;InvokeActionMethodAsync&gt;g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.&lt;InvokeNextActionFilterAsync&gt;g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State&amp; next, Scope&amp; scope, Object&amp; state, Boolean&amp; isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.&lt;InvokeInnerFilterAsync&gt;g__Awaited|13_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.&lt;InvokeNextResourceFilter&gt;g__Awaited|25_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Rethrow(ResourceExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Next(State&amp; next, Scope&amp; scope, Object&amp; state, Boolean&amp; isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.&lt;InvokeFilterPipelineAsync&gt;g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.&lt;InvokeAsync&gt;g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.&lt;InvokeAsync&gt;g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Builder.RouterMiddleware.Invoke(HttpContext httpContext)
+   at Kudu.Services.Web.Startup.&lt;&gt;c.&lt;&lt;Configure&gt;b__11_7&gt;d.MoveNext() in /tmp/KuduLite/Kudu.Services.Web/Startup.cs:line 428
+--- End of stack trace from previous location ---
+   at Kudu.Services.Web.Tracing.TraceMiddleware.Invoke(HttpContext context) in /tmp/KuduLite/Kudu.Services.Web/Tracing/TraceMiddleware.cs:line 101" innerText="npm warn deprecated node-domexception@1.0.0: Use your platform&apos;s native DOMException instead
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+Error: Could not find Prisma Schema that is required for this command.
+You can either provide it with `--schema` argument, set it as `prisma.schema` in your package.json or put it into the default location.
+Checked following paths:
+
+schema.prisma: file not found
+prisma/schema.prisma: file not found
+prisma/schema: directory not found
+
+See also https://pris.ly/d/prisma-schema-location
+npm error code 1
+npm error path /tmp/8de78922a8f33cd
+npm error command failed
+npm error command sh -c prisma generate
+npm error A complete log of this run can be found in: /home/.npm/_logs/2026-03-02T19_30_57_448Z-debug-0.log
+/bin/bash -c &quot;oryx build /tmp/zipdeploy/extracted -o /home/site/wwwroot --platform nodejs --platform-version 20 -p virtualenv_name= --log-file /tmp/build-debug.log  -i /tmp/8de78922a8f33cd -p compress_node_modules=tar-gz | tee /tmp/oryx-build.log ; exit $PIPESTATUS &quot;" innerStackTrace="   at Kudu.Core.Infrastructure.Executable.ExecuteInternal(ITracer tracer, Func`2 onWriteOutput, Func`2 onWriteError, CancellationToken token, Encoding encoding, String arguments, Object[] args) in /tmp/KuduLite/Kudu.Core/Infrastructure/Executable.cs:line 239
+   at Kudu.Core.Infrastructure.Executable.ExecuteWithProgressWriter(ILogger logger, ITracer tracer, CancellationToken token, String arguments, Object[] args) in /tmp/KuduLite/Kudu.Core/Infrastructure/Executable.cs:line 118
+   at Kudu.Core.Deployment.Generator.ExternalCommandBuilder.RunCommand(DeploymentContext context, String command, Boolean ignoreManifest, CancellationToken token, String message) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/ExternalCommandBuilder.cs:line 135
+   at Kudu.Core.Deployment.Generator.OryxBuilder.RunBuildCommand(IOryxArguments args, DeploymentContext context, CancellationToken token) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/OryxBuilder.cs:line 295
+   at Kudu.Core.Deployment.Generator.OryxBuilder.Build(DeploymentContext context, CancellationToken token) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/OryxBuilder.cs:line 136
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 771
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 840
+   at Kudu.Core.Deployment.DeploymentManager.DeployAsync(IRepository repository, ChangeSet changeSet, String deployer, Boolean clean, DeploymentInfoBase deploymentInfo, Boolean needFileUpdate, Boolean fullBuildByDefault) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 266" /><!-- duration: 3ms -->
+          <step title="Incoming Request" date="2026-03-02T19:32:51.460" url="/Error?type=zip&amp;async=False" method="POST" type="request" pid="833,1,17" Accept="*/*" Host="one1pos-api.scm.azurewebsites.net" User-Agent="AZURECLI/2.83.0 (MSI)" Accept-Encoding="gzip, deflate" Authorization="Bea..." Cache-Control="no-cache" Content-Type="application/octet-stream" Cookie="ARRAffinity=5b2008cde0b92d9a8a6da36c610692f13c692ed1ce73853cff06cc5bb1681877; ARRAffinitySameSite=5b2008cde0b92d9a8a6da36c610692f13c692ed1ce73853cff06cc5bb1681877" Content-Length="983985" x-ms-client-request-id="3273ab0a-166e-11f1-9c51-5cb47ee4698d" x-ms-artifact-checksum="ea10af40d7f7709d6d5f16a1c2d96c03e812a9783e23d66558e82f0fbbc7b546" X-ARR-LOG-ID="3273ab0a-166e-11f1-9c51-5cb47ee4698d" CLIENT-IP="154.208.55.126:49900" X-SITE-DEPLOYMENT-ID="one1pos-api" WAS-DEFAULT-HOSTNAME="one1pos-api.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/publish?type=zip&amp;async=False" X-Client-IP="154.208.55.126" X-Client-Port="49900" >
+            <step title="Outgoing response" date="2026-03-02T19:32:51.581" type="response" statusCode="400" statusText="BadRequest" /><!-- duration: 8ms -->
+          </step><!-- duration: 132ms -->

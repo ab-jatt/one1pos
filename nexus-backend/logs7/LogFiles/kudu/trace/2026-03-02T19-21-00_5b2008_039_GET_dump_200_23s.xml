@@ -1,0 +1,4 @@
+<step title="Incoming Request" date="2026-03-02T19:21:00.374" instance="5b2008" url="/dump" method="GET" type="request" pid="833,1,24" Host="one1pos-api.scm.azurewebsites.net" User-Agent="AZURECLI/2.83.0 (MSI)" Accept-Encoding="identity" Authorization="Bea..." x-ms-client-request-id="eca7ba1f-166c-11f1-85c5-5cb47ee4698d" X-ARR-LOG-ID="eca7ba1f-166c-11f1-85c5-5cb47ee4698d" CLIENT-IP="154.208.55.126:49631" X-SITE-DEPLOYMENT-ID="one1pos-api" WAS-DEFAULT-HOSTNAME="one1pos-api.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/dump" X-Client-IP="154.208.55.126" X-Client-Port="49631" >
+  <step title="Cleanup Xml Logs" date="2026-03-02T19:21:00.396" /><!-- duration: 70ms -->
+  <step title="Outgoing response" date="2026-03-02T19:21:23.799" type="response" statusCode="200" statusText="OK" /><!-- duration: 9ms -->
+</step><!-- duration: 23445ms -->

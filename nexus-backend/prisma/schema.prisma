@@ -1,0 +1,595 @@
+generator client {
+  provider="prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Branch {
+  id             String          @id @default(uuid())
+  name           String
+  address        String?
+  phone          String?
+  currency       String          @default("USD")
+  taxRate        Decimal         @default(0.08) @db.Decimal(5, 2)
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+  orders         Order[]
+  purchaseOrders PurchaseOrder[]
+  stocks         Stock[]
+  transactions   Transaction[]
+  users          User[]
+  exchanges      Exchange[]
+  warehouses       Warehouse[]
+  warehouseMovements WarehouseMovement[]
+  stockTransfers   StockTransfer[]
+  productionOrders ProductionOrder[]
+}
+
+model Setting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id                   String          @id @default(uuid())
+  email                String          @unique
+  password             String
+  name                 String
+  role                 Role            @default(CASHIER)
+  permissions          String[]
+  avatar               String?
+  branchId             String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  deletedAt            DateTime?
+  auditLogs            AuditLog[]
+  employee             Employee?
+  orders               Order[]         @relation("CashierOrders")
+  createdMovs          StockMovement[]
+  branch               Branch?         @relation(fields: [branchId], references: [id])
+  exchangesProcessed   Exchange[]      @relation("ExchangeProcessedBy")
+  exchangesAdjusted    Exchange[]      @relation("ExchangeAdjustedBy")
+  warehouseMovements   WarehouseMovement[] @relation("WarehouseMovementCreator")
+  stockTransfersCreated StockTransfer[]    @relation("TransferCreator")
+  stockTransfersApproved StockTransfer[]   @relation("TransferApprover")
+  productionOrders     ProductionOrder[]  @relation("ProductionOrderCreator")
+}
+
+model Employee {
+  id         String         @id @default(uuid())
+  userId     String         @unique
+  department String
+  position   String
+  salary     Decimal        @db.Decimal(10, 2)
+  status     EmployeeStatus @default(ACTIVE)
+  joinDate   DateTime
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  deletedAt  DateTime?
+  user       User           @relation(fields: [userId], references: [id])
+  payrolls   PayrollItem[]
+  shifts     Shift[]
+}
+
+model Shift {
+  id         String    @id @default(uuid())
+  employeeId String
+  startTime  DateTime
+  endTime    DateTime?
+  type       String
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  employee   Employee  @relation(fields: [employeeId], references: [id])
+}
+
+model PayrollRecord {
+  id          String        @id @default(uuid())
+  periodStart DateTime
+  periodEnd   DateTime
+  payDate     DateTime
+  totalPaid   Decimal       @db.Decimal(12, 2)
+  status      String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  items       PayrollItem[]
+}
+
+model PayrollItem {
+  id              String        @id @default(uuid())
+  payrollRecordId String
+  employeeId      String
+  amount          Decimal       @db.Decimal(10, 2)
+  deductions      Decimal       @default(0) @db.Decimal(10, 2)
+  bonuses         Decimal       @default(0) @db.Decimal(10, 2)
+  employee        Employee      @relation(fields: [employeeId], references: [id])
+  payrollRecord   PayrollRecord @relation(fields: [payrollRecordId], references: [id])
+}
+
+model Customer {
+  id        String           @id @default(uuid())
+  name      String
+  email     String?
+  phone     String?
+  points    Int              @default(0)
+  balance   Decimal          @default(0) @db.Decimal(10, 2)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  deletedAt DateTime?
+  ledger    CustomerLedger[]
+  orders    Order[]
+  exchanges Exchange[]
+}
+
+model CustomerLedger {
+  id          String    @id @default(uuid())
+  customerId  String
+  orderId     String?
+  exchangeId  String?
+  type        String    @default("CREDIT")
+  amount      Decimal   @db.Decimal(10, 2)
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  customer    Customer  @relation(fields: [customerId], references: [id])
+  exchange    Exchange? @relation("ExchangeLedgerEntries", fields: [exchangeId], references: [id])
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+}
+
+model Product {
+  id                   String              @id @default(uuid())
+  name                 String
+  sku                  String              @unique
+  description          String?
+  image                String?
+  price                Decimal             @db.Decimal(10, 2)
+  costPrice            Decimal             @db.Decimal(10, 2)
+  categoryId           String
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  deletedAt            DateTime?
+  orderItems           OrderItem[]
+  category             Category            @relation(fields: [categoryId], references: [id])
+  poItems              PurchaseOrderItem[]
+  stocks               Stock[]
+  exchangeReturnItems  ExchangeReturnItem[]
+  exchangeIssuedItems  ExchangeIssuedItem[]
+  warehouseMovements   WarehouseMovement[]
+  stockTransferItems   StockTransferItem[]
+  productionOrders     ProductionOrder[]
+  productionOrderItems ProductionOrderItem[]
+}
+
+model Stock {
+  id        String          @id @default(uuid())
+  branchId  String
+  productId String
+  quantity  Int             @default(0)
+  minStock  Int             @default(10)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  branch    Branch          @relation(fields: [branchId], references: [id])
+  product   Product         @relation(fields: [productId], references: [id])
+  movements StockMovement[]
+
+  @@unique([branchId, productId])
+}
+
+model StockMovement {
+  id           String       @id @default(uuid())
+  stockId      String
+  type         MovementType
+  reason       String?
+  referenceId  String?
+  createdById  String?
+  createdAt    DateTime     @default(now())
+  closingStock Int          @default(0)
+  openingStock Int          @default(0)
+  quantityIn   Int          @default(0)
+  quantityOut  Int          @default(0)
+  createdBy    User?        @relation(fields: [createdById], references: [id])
+  stock        Stock        @relation(fields: [stockId], references: [id])
+}
+
+model Supplier {
+  id             String          @id @default(uuid())
+  name           String
+  contactPerson  String?
+  email          String?
+  phone          String?
+  address        String?
+  paymentTerms   String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+  purchaseOrders PurchaseOrder[]
+}
+
+model PurchaseOrder {
+  id         String              @id @default(uuid())
+  supplierId String
+  branchId   String
+  status     PurchaseOrderStatus @default(PENDING)
+  total      Decimal             @db.Decimal(12, 2)
+  notes      String?
+  date       DateTime            @default(now())
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  branch     Branch              @relation(fields: [branchId], references: [id])
+  supplier   Supplier            @relation(fields: [supplierId], references: [id])
+  items      PurchaseOrderItem[]
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  productId       String
+  quantity        Int
+  cost            Decimal       @db.Decimal(10, 2)
+  product         Product       @relation(fields: [productId], references: [id])
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+}
+
+model Order {
+  id          String       @id @default(uuid())
+  orderNumber String       @unique
+  customerId  String?
+  cashierId   String
+  branchId    String
+  status      OrderStatus  @default(COMPLETED)
+  subtotal    Decimal      @db.Decimal(12, 2)
+  tax         Decimal      @db.Decimal(12, 2)
+  discount    Decimal      @default(0) @db.Decimal(12, 2)
+  total       Decimal      @db.Decimal(12, 2)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  branch      Branch       @relation(fields: [branchId], references: [id])
+  cashier     User         @relation("CashierOrders", fields: [cashierId], references: [id])
+  customer    Customer?    @relation(fields: [customerId], references: [id])
+  items       OrderItem[]
+  payments    Payment[]
+  transaction Transaction?
+  exchanges   Exchange[]
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Decimal @db.Decimal(10, 2)
+  cost      Decimal @db.Decimal(10, 2)
+  order     Order   @relation(fields: [orderId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  orderId     String
+  method      PaymentMethod
+  amount      Decimal       @db.Decimal(12, 2)
+  processedAt DateTime      @default(now())
+  order       Order         @relation(fields: [orderId], references: [id])
+}
+
+model Transaction {
+  id          String          @id @default(uuid())
+  branchId    String
+  description String
+  amount      Decimal         @db.Decimal(12, 2)
+  type        TransactionType
+  category    String
+  referenceId String?
+  orderId     String?         @unique
+  date        DateTime        @default(now())
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  branch      Branch          @relation(fields: [branchId], references: [id])
+  order       Order?          @relation(fields: [orderId], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  module    String
+  details   String?
+  ipAddress String?
+  timestamp DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  CASHIER
+}
+
+enum OrderStatus {
+  COMPLETED
+  PENDING
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  WALLET
+  SPLIT
+  CREDIT
+}
+
+enum PurchaseOrderStatus {
+  PENDING
+  RECEIVED
+  CANCELLED
+}
+
+enum MovementType {
+  SALE
+  RESTOCK
+  ADJUSTMENT
+  RETURN
+  TRANSFER_IN
+  TRANSFER_OUT
+  DAMAGE
+  EXCHANGE_IN    // Stock returned via exchange
+  EXCHANGE_OUT   // Stock issued via exchange
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+// Exchange System Models
+model Exchange {
+  id                  String         @id @default(uuid())
+  exchangeNumber      String         @unique
+  originalOrderId     String
+  customerId          String?
+  branchId            String
+  processedById       String?        // User who processed the exchange
+  returnedTotal       Decimal        @db.Decimal(12, 2)
+  issuedTotal         Decimal        @db.Decimal(12, 2)
+  calculatedAmount    Decimal        @db.Decimal(12, 2) // System-calculated: issuedTotal - returnedTotal
+  adjustedAmount      Decimal?       @db.Decimal(12, 2) // Final amount after manual adjustment (null = no adjustment)
+  adjustmentReason    String?        // Mandatory if adjustment is made
+  adjustedById        String?        // User who made the adjustment
+  difference          Decimal        @db.Decimal(12, 2) // Final difference used for payment (adjusted or calculated)
+  paymentMethod       PaymentMethod?
+  paymentStatus       ExchangePaymentStatus @default(PENDING)
+  status              ExchangeStatus @default(COMPLETED)
+  notes               String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  branch              Branch         @relation(fields: [branchId], references: [id])
+  customer            Customer?      @relation(fields: [customerId], references: [id])
+  originalOrder       Order          @relation(fields: [originalOrderId], references: [id])
+  processedBy         User?          @relation("ExchangeProcessedBy", fields: [processedById], references: [id])
+  adjustedBy          User?          @relation("ExchangeAdjustedBy", fields: [adjustedById], references: [id])
+  returnedItems       ExchangeReturnItem[]
+  issuedItems         ExchangeIssuedItem[]
+  ledgerEntries       CustomerLedger[] @relation("ExchangeLedgerEntries")
+}
+
+model ExchangeReturnItem {
+  id          String   @id @default(uuid())
+  exchangeId  String
+  productId   String
+  quantity    Int
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  totalPrice  Decimal  @db.Decimal(10, 2)
+  exchange    Exchange @relation(fields: [exchangeId], references: [id])
+  product     Product  @relation(fields: [productId], references: [id])
+}
+
+model ExchangeIssuedItem {
+  id          String   @id @default(uuid())
+  exchangeId  String
+  productId   String
+  quantity    Int
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  totalPrice  Decimal  @db.Decimal(10, 2)
+  exchange    Exchange @relation(fields: [exchangeId], references: [id])
+  product     Product  @relation(fields: [productId], references: [id])
+}
+
+enum ExchangeStatus {
+  COMPLETED
+  CANCELLED
+}
+
+enum ExchangePaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  CREDIT_ISSUED
+  CREDIT_USED
+  NOT_APPLICABLE
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WAREHOUSE MANAGEMENT + PRODUCTION + STOCK MOVEMENT TRACKING
+// ═══════════════════════════════════════════════════════════════
+
+model Warehouse {
+  id              String              @id @default(uuid())
+  branchId        String
+  name            String
+  code            String
+  type            WarehouseType       @default(RAW_MATERIAL)
+  isDefault       Boolean             @default(false)
+  isActive        Boolean             @default(true)
+  address         String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  deletedAt       DateTime?
+  branch          Branch              @relation(fields: [branchId], references: [id])
+  locations       WarehouseLocation[]
+  movementsFrom   WarehouseMovement[] @relation("MovementFromWarehouse")
+  movementsTo     WarehouseMovement[] @relation("MovementToWarehouse")
+  transfersFrom   StockTransfer[]     @relation("TransferFromWarehouse")
+  transfersTo     StockTransfer[]     @relation("TransferToWarehouse")
+
+  @@unique([branchId, code])
+}
+
+model WarehouseLocation {
+  id          String    @id @default(uuid())
+  warehouseId String
+  name        String
+  code        String
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+
+  @@unique([warehouseId, code])
+}
+
+model WarehouseMovement {
+  id              String                @id @default(uuid())
+  branchId        String
+  productId       String
+  fromWarehouseId String?
+  toWarehouseId   String?
+  quantity        Int
+  unitCost        Decimal               @default(0) @db.Decimal(10, 2)
+  totalCost       Decimal               @default(0) @db.Decimal(12, 2)
+  movementType    WarehouseMovementType
+  referenceType   String?               // PURCHASE, PRODUCTION, SALE, TRANSFER, ADJUSTMENT
+  referenceId     String?
+  notes           String?
+  createdById     String?
+  createdAt       DateTime              @default(now())
+  branch          Branch                @relation(fields: [branchId], references: [id])
+  product         Product               @relation(fields: [productId], references: [id])
+  fromWarehouse   Warehouse?            @relation("MovementFromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouse     Warehouse?            @relation("MovementToWarehouse", fields: [toWarehouseId], references: [id])
+  createdBy       User?                 @relation("WarehouseMovementCreator", fields: [createdById], references: [id])
+}
+
+model StockTransfer {
+  id              String              @id @default(uuid())
+  branchId        String
+  transferNumber  String              @unique
+  fromWarehouseId String
+  toWarehouseId   String
+  status          StockTransferStatus @default(DRAFT)
+  notes           String?
+  createdById     String?
+  approvedById    String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  completedAt     DateTime?
+  branch          Branch              @relation(fields: [branchId], references: [id])
+  fromWarehouse   Warehouse           @relation("TransferFromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouse     Warehouse           @relation("TransferToWarehouse", fields: [toWarehouseId], references: [id])
+  createdBy       User?               @relation("TransferCreator", fields: [createdById], references: [id])
+  approvedBy      User?               @relation("TransferApprover", fields: [approvedById], references: [id])
+  items           StockTransferItem[]
+}
+
+model StockTransferItem {
+  id              String        @id @default(uuid())
+  stockTransferId String
+  productId       String
+  quantity        Int
+  unitCost        Decimal       @default(0) @db.Decimal(10, 2)
+  stockTransfer   StockTransfer @relation(fields: [stockTransferId], references: [id])
+  product         Product       @relation(fields: [productId], references: [id])
+}
+
+model ProductionOrder {
+  id              String                @id @default(uuid())
+  branchId        String
+  orderNumber     String                @unique
+  productId       String                // Finished goods product
+  quantity        Int                   // Quantity to produce
+  completedQty    Int                   @default(0)
+  status          ProductionOrderStatus @default(DRAFT)
+  rawMaterialCost Decimal               @default(0) @db.Decimal(12, 2)
+  totalCost       Decimal               @default(0) @db.Decimal(12, 2)
+  notes           String?
+  startDate       DateTime?
+  completedDate   DateTime?
+  createdById     String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  branch          Branch                @relation(fields: [branchId], references: [id])
+  product         Product               @relation(fields: [productId], references: [id])
+  createdBy       User?                 @relation("ProductionOrderCreator", fields: [createdById], references: [id])
+  items           ProductionOrderItem[]
+}
+
+model ProductionOrderItem {
+  id                String          @id @default(uuid())
+  productionOrderId String
+  productId         String          // Raw material product
+  requiredQty       Int
+  issuedQty         Int             @default(0)
+  returnedQty       Int             @default(0)
+  unitCost          Decimal         @default(0) @db.Decimal(10, 2)
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id])
+  product           Product         @relation(fields: [productId], references: [id])
+}
+
+enum WarehouseType {
+  RAW_MATERIAL
+  PRODUCTION
+  FINISHED_GOODS
+  SCRAP
+  GENERAL
+}
+
+enum WarehouseMovementType {
+  PURCHASE_RECEIVE
+  SALES_DISPATCH
+  PRODUCTION_ISSUE
+  PRODUCTION_RECEIVE
+  TRANSFER
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  RETURN_IN
+  RETURN_OUT
+}
+
+enum StockTransferStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  COMPLETED
+  CANCELLED
+}
+
+enum ProductionOrderStatus {
+  DRAFT
+  MATERIALS_ISSUED
+  IN_PROGRESS
+  COMPLETED
+  RECEIVED
+  CANCELLED
+}

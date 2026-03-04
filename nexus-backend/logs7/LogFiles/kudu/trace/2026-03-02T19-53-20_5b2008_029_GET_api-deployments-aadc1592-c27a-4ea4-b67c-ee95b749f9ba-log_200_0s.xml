@@ -1,0 +1,6 @@
+<step title="Incoming Request" date="2026-03-02T19:53:20.275" instance="5b2008" url="/api/deployments/aadc1592-c27a-4ea4-b67c-ee95b749f9ba/log" method="GET" type="request" pid="833,1,7" Accept="*/*" Host="one1pos-api.scm.azurewebsites.net" User-Agent="AZURECLI/2.83.0 (MSI)" Accept-Encoding="gzip, deflate" Authorization="Bea..." x-ms-client-request-id="6ef6fc2c-1671-11f1-9ddd-5cb47ee4698d" X-ARR-LOG-ID="6ef6fc2c-1671-11f1-9ddd-5cb47ee4698d" CLIENT-IP="154.208.55.126:49818" X-SITE-DEPLOYMENT-ID="one1pos-api" WAS-DEFAULT-HOSTNAME="one1pos-api.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/deployments/aadc1592-c27a-4ea4-b67c-ee95b749f9ba/log" X-Client-IP="154.208.55.126" X-Client-Port="49818" >
+  <step title="DeploymentService.GetLogEntry" date="2026-03-02T19:53:20.294" >
+    <step title="DeploymentManager.GetLogEntries(id:aadc1592-c27a-4ea4-b67c-ee95b749f9ba)" date="2026-03-02T19:53:20.295" /><!-- duration: 200ms -->
+  </step><!-- duration: 212ms -->
+  <step title="Outgoing response" date="2026-03-02T19:53:20.516" type="response" statusCode="200" statusText="OK" /><!-- duration: 19ms -->
+</step><!-- duration: 270ms -->

@@ -1,0 +1,106 @@
+2026-03-02T18:24:16  Fetching changes.
+2026-03-02T18:24:16    Starting  LocalZipHandler
+2026-03-02T18:24:16    Cleaning up temp folders from previous zip deployments and extracting pushed zip file /tmp/zipdeploy/f756f189-2f0c-4ca8-b1ec-03a2d834bcc9.zip (0.37 MB) to /tmp/zipdeploy/extracted
+2026-03-02T18:24:19  Updating submodules.
+2026-03-02T18:24:19  Preparing deployment for commit id '224ab635-3'.
+2026-03-02T18:24:20  PreDeployment: context.CleanOutputPath False
+2026-03-02T18:24:20  PreDeployment: context.OutputPath /home/site/wwwroot
+2026-03-02T18:24:20  Repository path is /tmp/zipdeploy/extracted
+2026-03-02T18:24:20  Running oryx build...
+2026-03-02T18:24:20    Command: oryx build /tmp/zipdeploy/extracted -o /home/site/wwwroot --platform nodejs --platform-version 20 -p virtualenv_name= --log-file /tmp/build-debug.log  -i /tmp/8de7888ebca6133 -p compress_node_modules=tar-gz | tee /tmp/oryx-build.log
+2026-03-02T18:24:21    Operation performed by Microsoft Oryx, https://github.com/Microsoft/Oryx
+2026-03-02T18:24:21    You can report issues at https://github.com/Microsoft/Oryx/issues
+2026-03-02T18:24:21    
+2026-03-02T18:24:21    Oryx Version: 0.2.20260204.1+0fdbe200b286be083841ff7fa201c6c2316dc6b9, Commit: 0fdbe200b286be083841ff7fa201c6c2316dc6b9, ReleaseTagName: 20260204.1
+2026-03-02T18:24:21    
+2026-03-02T18:24:21    Build Operation ID: c8867fe6eaa3fb38
+2026-03-02T18:24:21    Repository Commit : 224ab635-368d-4446-a9af-76187d933372
+2026-03-02T18:24:21    OS Type           : bookworm
+2026-03-02T18:24:21    Image Type        : githubactions
+2026-03-02T18:24:21    
+2026-03-02T18:24:21    Primary SDK Storage URL: https://oryx-cdn.microsoft.io
+2026-03-02T18:24:21    Backup SDK Storage URL: 
+2026-03-02T18:24:21    Detecting platforms...
+2026-03-02T18:24:21    External SDK provider is enabled.
+2026-03-02T18:24:21    Requesting metadata for platform nodejs from external SDK provider
+2026-03-02T18:24:23    Requesting metadata for platform nodejs from external SDK provider
+2026-03-02T18:24:24    Successfully requested blob for platform nodejs, blobName defaultVersion.bookworm.txt, available at /var/OryxSdks/nodejs/defaultVersion.bookworm.txt
+2026-03-02T18:24:24    Detected following platforms:
+2026-03-02T18:24:24      nodejs: 20.20.0
+2026-03-02T18:24:24    Requesting metadata for platform nodejs from external SDK provider
+2026-03-02T18:24:26    Successfully requested blob for platform nodejs, blobName nodejs-bookworm-20.20.0.tar.gz, available at /var/OryxSdks/nodejs/nodejs-bookworm-20.20.0.tar.gz
+2026-03-02T18:24:26    Version '20.20.0' of platform 'nodejs' is not installed. Generating script to install it...
+2026-03-02T18:24:26    Detected the following frameworks: Typescript
+2026-03-02T18:24:26    
+2026-03-02T18:24:26    Using intermediate directory '/tmp/8de7888ebca6133'.
+2026-03-02T18:24:26    
+2026-03-02T18:24:26    Copying files to the intermediate directory...
+2026-03-02T18:24:26    Copying files to intermediate directory done in 0 sec(s).
+2026-03-02T18:24:26    
+2026-03-02T18:24:26    Source directory     : /tmp/8de7888ebca6133
+2026-03-02T18:24:26    Destination directory: /home/site/wwwroot
+2026-03-02T18:24:26    
+2026-03-02T18:24:26    Installing platform...
+2026-03-02T18:24:26    
+2026-03-02T18:24:26    Downloading and extracting 'nodejs' version '20.20.0' to '/tmp/oryx/platforms/nodejs/20.20.0'...
+2026-03-02T18:24:26    Detected image debian flavor: bookworm.
+2026-03-02T18:24:26    Skipping download of nodejs version 20.20.0 as it is available in external sdk provider cache...
+2026-03-02T18:24:26    Extracting contents...
+2026-03-02T18:24:30    Successfully extracted nodejs version 20.20.0 from external sdk provider cache...
+2026-03-02T18:24:30    
+2026-03-02T18:24:30    Platform installation done in 3 sec(s).
+2026-03-02T18:24:30    Running build script snippets...
+2026-03-02T18:24:30    Removing existing manifest file
+2026-03-02T18:24:30    Creating directory for command manifest file if it does not exist
+2026-03-02T18:24:30    Creating a manifest file...
+2026-03-02T18:24:30    Node Build Command Manifest file created.
+2026-03-02T18:24:30    
+2026-03-02T18:24:30    Using Node version:
+2026-03-02T18:24:30    v20.20.0
+2026-03-02T18:24:30    
+2026-03-02T18:24:30    Using Npm version:
+2026-03-02T18:24:30    10.8.2
+2026-03-02T18:24:30    
+2026-03-02T18:24:30    Running 'npm install'...
+2026-03-02T18:24:30    
+2026-03-02T18:24:35    npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+2026-03-02T18:24:35    npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+2026-03-02T18:24:43    
+2026-03-02T18:24:43    added 306 packages, and audited 307 packages in 12s
+2026-03-02T18:24:43    
+2026-03-02T18:24:43    65 packages are looking for funding
+2026-03-02T18:24:43      run `npm fund` for details
+2026-03-02T18:24:43    
+2026-03-02T18:24:43    4 vulnerabilities (1 low, 3 high)
+2026-03-02T18:24:43    
+2026-03-02T18:24:43    To address issues that do not require attention, run:
+2026-03-02T18:24:43      npm audit fix
+2026-03-02T18:24:43    
+2026-03-02T18:24:43    To address all issues (including breaking changes), run:
+2026-03-02T18:24:43      npm audit fix --force
+2026-03-02T18:24:43    
+2026-03-02T18:24:43    Run `npm audit` for details.
+2026-03-02T18:24:43    
+2026-03-02T18:24:43    Running 'npm run build'...
+2026-03-02T18:24:43    
+2026-03-02T18:24:43    
+2026-03-02T18:24:43    > nexus-backend@0.0.1 build
+2026-03-02T18:24:43    > nest build
+2026-03-02T18:24:43    sh: 1: nest: not found
+2026-03-02T18:24:43    
+2026-03-02T18:24:45    npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+sh: 1: nest: not found
+/bin/bash -c "oryx build /tmp/zipdeploy/extracted -o /home/site/wwwroot --platform nodejs --platform-version 20 -p virtualenv_name= --log-file /tmp/build-debug.log  -i /tmp/8de7888ebca6133 -p compress_node_modules=tar-gz | tee /tmp/oryx-build.log ; exit $PIPESTATUS "
+2026-03-02T18:24:45  
+2026-03-02T18:24:45  
+2026-03-02T18:24:45  Generating summary of Oryx build
+2026-03-02T18:24:45  Parsing the build logs
+2026-03-02T18:24:45  Found 0 issue(s)
+2026-03-02T18:24:45  
+2026-03-02T18:24:46  Build Summary :
+2026-03-02T18:24:46  ===============
+2026-03-02T18:24:46  Errors (0)
+2026-03-02T18:24:46  Warnings (0)
+2026-03-02T18:24:46  
+2026-03-02T18:24:47  Deployment Failed. deployer = OneDeploy deploymentPath = OneDeploy
