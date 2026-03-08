@@ -1,6 +1,6 @@
 generator client {
-  provider="prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-3.0.x", "debian-openssl-1.1.x"]
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x", "debian-openssl-1.1.x"]
 }
 
 datasource db {
@@ -15,6 +15,8 @@ model Branch {
   phone          String?
   currency       String          @default("USD")
   taxRate        Decimal         @default(0.08) @db.Decimal(5, 2)
+  ownerId        String          @default("")
+  subscription   Subscription?
   isActive       Boolean         @default(true)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
@@ -29,6 +31,7 @@ model Branch {
   warehouseMovements WarehouseMovement[]
   stockTransfers   StockTransfer[]
   productionOrders ProductionOrder[]
+  categories       Category[]
 }
 
 model Setting {
@@ -36,6 +39,28 @@ model Setting {
   key       String   @unique
   value     String
   updatedAt DateTime @updatedAt
+}
+
+model Plan {
+  id          String         @id @default(uuid())
+  name        String
+  price       Float
+  maxUsers    Int
+  maxProducts Int
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id        String    @id @default(uuid())
+  branchId  String    @unique
+  planId    String
+  status    String
+  startDate DateTime  @default(now())
+  endDate   DateTime?
+
+  branch Branch @relation(fields: [branchId], references: [id])
+  plan   Plan   @relation(fields: [planId], references: [id])
 }
 
 model User {
@@ -46,7 +71,7 @@ model User {
   role                 Role            @default(CASHIER)
   permissions          String[]
   avatar               String?
-  branchId             String?
+  branchId             String
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
   deletedAt            DateTime?
@@ -54,7 +79,7 @@ model User {
   employee             Employee?
   orders               Order[]         @relation("CashierOrders")
   createdMovs          StockMovement[]
-  branch               Branch?         @relation(fields: [branchId], references: [id])
+  branch               Branch          @relation(fields: [branchId], references: [id])
   exchangesProcessed   Exchange[]      @relation("ExchangeProcessedBy")
   exchangesAdjusted    Exchange[]      @relation("ExchangeAdjustedBy")
   warehouseMovements   WarehouseMovement[] @relation("WarehouseMovementCreator")
@@ -145,16 +170,22 @@ model CustomerLedger {
 
 model Category {
   id        String    @id @default(uuid())
-  name      String    @unique
+  name      String
+  branchId  String
+  branch    Branch    @relation(fields: [branchId], references: [id])
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   products  Product[]
+
+  @@unique([branchId, name])
 }
 
 model Product {
   id                   String              @id @default(uuid())
   name                 String
   sku                  String              @unique
+  productCode          String              @unique
+  barcode              String?             @unique
   description          String?
   image                String?
   price                Decimal             @db.Decimal(10, 2)
@@ -315,7 +346,7 @@ model AuditLog {
 }
 
 enum Role {
-  ADMIN
+  OWNER
   MANAGER
   CASHIER
 }

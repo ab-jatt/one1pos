@@ -61,10 +61,10 @@ const Navbar: React.FC<NavbarProps> = ({ darkMode, toggleTheme }) => {
       icon: ShoppingCart,
       label: t('pos') || 'Sales',
       color: 'sky',
-      roles: [Role.ADMIN, Role.MANAGER, Role.CASHIER],
+      roles: [Role.OWNER, Role.MANAGER, Role.CASHIER],
       items: [
-        { icon: ShoppingCart, label: t('pos'), path: '/pos', roles: [Role.ADMIN, Role.MANAGER, Role.CASHIER] },
-        { icon: Users, label: t('customers'), path: '/customers', roles: [Role.ADMIN, Role.MANAGER, Role.CASHIER] },
+        { icon: ShoppingCart, label: t('pos'), path: '/pos', roles: [Role.OWNER, Role.MANAGER, Role.CASHIER] },
+        { icon: Users, label: t('customers'), path: '/customers', roles: [Role.OWNER, Role.MANAGER, Role.CASHIER] },
       ],
     },
     {
@@ -72,13 +72,13 @@ const Navbar: React.FC<NavbarProps> = ({ darkMode, toggleTheme }) => {
       icon: Package,
       label: t('inventory') || 'Inventory',
       color: 'emerald',
-      roles: [Role.ADMIN, Role.MANAGER],
+      roles: [Role.OWNER, Role.MANAGER],
       items: [
-        { icon: Package, label: t('inventory'), path: '/inventory', roles: [Role.ADMIN, Role.MANAGER] },
-        { icon: ClipboardList, label: t('stockReport'), path: '/stock-report', roles: [Role.ADMIN, Role.MANAGER] },
-        { icon: Warehouse, label: 'Warehouses', path: '/warehouses', roles: [Role.ADMIN, Role.MANAGER] },
-        { icon: ArrowLeftRight, label: 'Stock Moves', path: '/stock-movements', roles: [Role.ADMIN, Role.MANAGER] },
-        { icon: BarChart3, label: 'WH Reports', path: '/warehouse-reports', roles: [Role.ADMIN, Role.MANAGER] },
+        { icon: Package, label: t('inventory'), path: '/inventory', roles: [Role.OWNER, Role.MANAGER] },
+        { icon: ClipboardList, label: t('stockReport'), path: '/stock-report', roles: [Role.OWNER, Role.MANAGER] },
+        { icon: Warehouse, label: 'Warehouses', path: '/warehouses', roles: [Role.OWNER, Role.MANAGER] },
+        { icon: ArrowLeftRight, label: 'Stock Moves', path: '/stock-movements', roles: [Role.OWNER, Role.MANAGER] },
+        { icon: BarChart3, label: 'WH Reports', path: '/warehouse-reports', roles: [Role.OWNER, Role.MANAGER] },
       ],
     },
     {
@@ -86,9 +86,9 @@ const Navbar: React.FC<NavbarProps> = ({ darkMode, toggleTheme }) => {
       icon: Factory,
       label: 'Production',
       color: 'amber',
-      roles: [Role.ADMIN, Role.MANAGER],
+      roles: [Role.OWNER, Role.MANAGER],
       items: [
-        { icon: Factory, label: 'Production', path: '/production', roles: [Role.ADMIN, Role.MANAGER] },
+        { icon: Factory, label: 'Production', path: '/production', roles: [Role.OWNER, Role.MANAGER] },
       ],
     },
     {
@@ -96,10 +96,10 @@ const Navbar: React.FC<NavbarProps> = ({ darkMode, toggleTheme }) => {
       icon: ShoppingBag,
       label: t('purchasing') || 'Purchasing',
       color: 'violet',
-      roles: [Role.ADMIN, Role.MANAGER],
+      roles: [Role.OWNER, Role.MANAGER],
       items: [
-        { icon: ShoppingBag, label: t('purchasing'), path: '/purchasing', roles: [Role.ADMIN, Role.MANAGER] },
-        { icon: Truck, label: t('suppliers'), path: '/suppliers', roles: [Role.ADMIN, Role.MANAGER] },
+        { icon: ShoppingBag, label: t('purchasing'), path: '/purchasing', roles: [Role.OWNER, Role.MANAGER] },
+        { icon: Truck, label: t('suppliers'), path: '/suppliers', roles: [Role.OWNER, Role.MANAGER] },
       ],
     },
     {
@@ -107,10 +107,10 @@ const Navbar: React.FC<NavbarProps> = ({ darkMode, toggleTheme }) => {
       icon: DollarSign,
       label: t('accounting') || 'Finance',
       color: 'rose',
-      roles: [Role.ADMIN, Role.MANAGER],
+      roles: [Role.OWNER, Role.MANAGER],
       items: [
-        { icon: FileText, label: t('accounting'), path: '/accounting', roles: [Role.ADMIN] },
-        { icon: BarChart3, label: t('reports'), path: '/reports', roles: [Role.ADMIN, Role.MANAGER] },
+        { icon: FileText, label: t('accounting'), path: '/accounting', roles: [Role.OWNER] },
+        { icon: BarChart3, label: t('reports'), path: '/reports', roles: [Role.OWNER, Role.MANAGER] },
       ],
     },
     {
@@ -118,11 +118,11 @@ const Navbar: React.FC<NavbarProps> = ({ darkMode, toggleTheme }) => {
       icon: Cog,
       label: 'Admin',
       color: 'neutral',
-      roles: [Role.ADMIN],
+      roles: [Role.OWNER],
       items: [
-        { icon: Briefcase, label: t('hr'), path: '/hr', roles: [Role.ADMIN] },
-        { icon: Shield, label: t('security'), path: '/security', roles: [Role.ADMIN] },
-        { icon: Settings, label: t('settings'), path: '/settings', roles: [Role.ADMIN] },
+        { icon: Briefcase, label: t('hr'), path: '/hr', roles: [Role.OWNER] },
+        { icon: Shield, label: t('security'), path: '/security', roles: [Role.OWNER] },
+        { icon: Settings, label: t('settings'), path: '/settings', roles: [Role.OWNER] },
       ],
     },
   ], [t]);

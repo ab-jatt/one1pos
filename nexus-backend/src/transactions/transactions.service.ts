@@ -5,8 +5,9 @@ import { PrismaService } from '../prisma/prisma.service';
 export class TransactionsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll() {
+  async findAll(branchId: string) {
     const transactions = await this.prisma.transaction.findMany({
+      where: { branchId },
       orderBy: { date: 'desc' },
       take: 100,
     });
@@ -40,7 +41,7 @@ export class TransactionsService {
     };
   }
 
-  async create(dto: any) {
+  async create(dto: any, branchId: string) {
     const transaction = await this.prisma.transaction.create({
       data: {
         description: dto.description,
@@ -48,7 +49,7 @@ export class TransactionsService {
         type: dto.type === 'Income' ? 'INCOME' : 'EXPENSE',
         category: dto.category,
         date: dto.date ? new Date(dto.date) : new Date(),
-        branchId: dto.branchId,
+        branchId,
       },
     });
 
@@ -62,16 +63,16 @@ export class TransactionsService {
     };
   }
 
-  async getFinancialStats() {
+  async getFinancialStats(branchId: string) {
     // Get income
     const income = await this.prisma.transaction.aggregate({
-      where: { type: 'INCOME' },
+      where: { branchId, type: 'INCOME' },
       _sum: { amount: true },
     });
 
     // Get expenses
     const expenses = await this.prisma.transaction.aggregate({
-      where: { type: 'EXPENSE' },
+      where: { branchId, type: 'EXPENSE' },
       _sum: { amount: true },
     });
 

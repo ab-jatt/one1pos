@@ -115,112 +115,112 @@ const AppContent: React.FC = () => {
           
           {/* Dashboard: Admin & Manager */}
           <Route path="/dashboard" element={
-            <ProtectedRoute allowedRoles={[Role.ADMIN, Role.MANAGER]}>
+            <ProtectedRoute allowedRoles={[Role.OWNER, Role.MANAGER]}>
               <Dashboard />
             </ProtectedRoute>
           } />
 
           {/* POS: Everyone */}
           <Route path="/pos" element={
-            <ProtectedRoute allowedRoles={[Role.ADMIN, Role.MANAGER, Role.CASHIER]}>
+            <ProtectedRoute allowedRoles={[Role.OWNER, Role.MANAGER, Role.CASHIER]}>
               <POS />
             </ProtectedRoute>
           } />
 
           {/* Inventory: Admin & Manager */}
           <Route path="/inventory" element={
-            <ProtectedRoute allowedRoles={[Role.ADMIN, Role.MANAGER]}>
+            <ProtectedRoute allowedRoles={[Role.OWNER, Role.MANAGER]}>
               <Inventory />
             </ProtectedRoute>
           } />
 
           {/* Stock Report: Admin & Manager */}
           <Route path="/stock-report" element={
-            <ProtectedRoute allowedRoles={[Role.ADMIN, Role.MANAGER]}>
+            <ProtectedRoute allowedRoles={[Role.OWNER, Role.MANAGER]}>
               <StockReport />
             </ProtectedRoute>
           } />
 
           {/* Customers: Everyone */}
           <Route path="/customers" element={
-            <ProtectedRoute allowedRoles={[Role.ADMIN, Role.MANAGER, Role.CASHIER]}>
+            <ProtectedRoute allowedRoles={[Role.OWNER, Role.MANAGER, Role.CASHIER]}>
               <Customers />
             </ProtectedRoute>
           } />
 
           {/* Suppliers: Admin & Manager */}
           <Route path="/suppliers" element={
-            <ProtectedRoute allowedRoles={[Role.ADMIN, Role.MANAGER]}>
+            <ProtectedRoute allowedRoles={[Role.OWNER, Role.MANAGER]}>
               <Suppliers />
             </ProtectedRoute>
           } />
 
           {/* Purchasing: Admin & Manager */}
           <Route path="/purchasing" element={
-            <ProtectedRoute allowedRoles={[Role.ADMIN, Role.MANAGER]}>
+            <ProtectedRoute allowedRoles={[Role.OWNER, Role.MANAGER]}>
               <Purchasing />
             </ProtectedRoute>
           } />
 
           {/* Accounting: Admin Only */}
           <Route path="/accounting" element={
-            <ProtectedRoute allowedRoles={[Role.ADMIN]}>
+            <ProtectedRoute allowedRoles={[Role.OWNER]}>
               <Accounting />
             </ProtectedRoute>
           } />
 
           {/* HR: Admin Only */}
           <Route path="/hr" element={
-            <ProtectedRoute allowedRoles={[Role.ADMIN]}>
+            <ProtectedRoute allowedRoles={[Role.OWNER]}>
               <HR />
             </ProtectedRoute>
           } />
 
           {/* Reports: Admin & Manager */}
           <Route path="/reports" element={
-            <ProtectedRoute allowedRoles={[Role.ADMIN, Role.MANAGER]}>
+            <ProtectedRoute allowedRoles={[Role.OWNER, Role.MANAGER]}>
               <Reports />
             </ProtectedRoute>
           } />
 
           {/* Security: Admin Only */}
           <Route path="/security" element={
-            <ProtectedRoute allowedRoles={[Role.ADMIN]}>
+            <ProtectedRoute allowedRoles={[Role.OWNER]}>
               <Security />
             </ProtectedRoute>
           } />
 
           {/* Settings: Admin Only */}
           <Route path="/settings" element={
-            <ProtectedRoute allowedRoles={[Role.ADMIN]}>
+            <ProtectedRoute allowedRoles={[Role.OWNER]}>
               <Settings />
             </ProtectedRoute>
           } />
 
           {/* Warehouses: Admin & Manager */}
           <Route path="/warehouses" element={
-            <ProtectedRoute allowedRoles={[Role.ADMIN, Role.MANAGER]}>
+            <ProtectedRoute allowedRoles={[Role.OWNER, Role.MANAGER]}>
               <Warehouses />
             </ProtectedRoute>
           } />
 
           {/* Production: Admin & Manager */}
           <Route path="/production" element={
-            <ProtectedRoute allowedRoles={[Role.ADMIN, Role.MANAGER]}>
+            <ProtectedRoute allowedRoles={[Role.OWNER, Role.MANAGER]}>
               <Production />
             </ProtectedRoute>
           } />
 
           {/* Stock Movements: Admin & Manager */}
           <Route path="/stock-movements" element={
-            <ProtectedRoute allowedRoles={[Role.ADMIN, Role.MANAGER]}>
+            <ProtectedRoute allowedRoles={[Role.OWNER, Role.MANAGER]}>
               <StockMovements />
             </ProtectedRoute>
           } />
 
           {/* Warehouse Reports: Admin & Manager */}
           <Route path="/warehouse-reports" element={
-            <ProtectedRoute allowedRoles={[Role.ADMIN, Role.MANAGER]}>
+            <ProtectedRoute allowedRoles={[Role.OWNER, Role.MANAGER]}>
               <WarehouseReports />
             </ProtectedRoute>
           } />

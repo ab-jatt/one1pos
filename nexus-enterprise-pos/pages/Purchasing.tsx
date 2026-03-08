@@ -99,7 +99,6 @@ const Purchasing: React.FC = () => {
     // Build the payload expected by the backend
     const payload = {
       supplierId,
-      branchId: 'main-branch-id',
       status,
       items: validItems.map(item => ({
         productId: item.productId,

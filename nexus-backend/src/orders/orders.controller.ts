@@ -5,6 +5,7 @@ import {
   Body,
   Param,
   Query,
+  Req,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -15,13 +16,13 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Get()
-  findAll(@Query('branchId') branchId?: string) {
-    return this.ordersService.findAll(branchId);
+  findAll(@Req() req: any) {
+    return this.ordersService.findAll(req.user.branchId);
   }
 
   @Get('stats')
-  getStats(@Query('branchId') branchId?: string) {
-    return this.ordersService.getStats(branchId);
+  getStats(@Req() req: any) {
+    return this.ordersService.getStats(req.user.branchId);
   }
 
   @Get(':id')
@@ -35,8 +36,8 @@ export class OrdersController {
   }
 
   @Post()
-  create(@Body() createOrderDto: CreateOrderDto) {
-    return this.ordersService.create(createOrderDto);
+  create(@Req() req: any, @Body() createOrderDto: CreateOrderDto) {
+    return this.ordersService.create(createOrderDto, req.user.branchId);
   }
 
   @Post(':id/refund')

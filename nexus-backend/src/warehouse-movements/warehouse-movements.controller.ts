@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Req } from '@nestjs/common';
 import { WarehouseMovementsService } from './warehouse-movements.service';
 
 @Controller('warehouse-movements')
@@ -7,7 +7,7 @@ export class WarehouseMovementsController {
 
   @Get()
   findAll(
-    @Query('branchId') branchId?: string,
+    @Req() req: any,
     @Query('warehouseId') warehouseId?: string,
     @Query('productId') productId?: string,
     @Query('movementType') movementType?: string,
@@ -18,7 +18,7 @@ export class WarehouseMovementsController {
     @Query('limit') limit?: string,
   ) {
     return this.movementsService.findAll({
-      branchId,
+      branchId: req.user.branchId,
       warehouseId,
       productId,
       movementType: movementType as any,
@@ -32,32 +32,32 @@ export class WarehouseMovementsController {
 
   @Get('balances')
   getStockBalances(
-    @Query('branchId') branchId?: string,
+    @Req() req: any,
     @Query('warehouseId') warehouseId?: string,
     @Query('productId') productId?: string,
   ) {
-    return this.movementsService.getStockBalances({ branchId, warehouseId, productId });
+    return this.movementsService.getStockBalances({ branchId: req.user.branchId, warehouseId, productId });
   }
 
   @Post('adjustment')
-  createAdjustment(@Body() dto: any) {
-    return this.movementsService.createAdjustment(dto);
+  createAdjustment(@Req() req: any, @Body() dto: any) {
+    return this.movementsService.createAdjustment({ ...dto, branchId: req.user.branchId });
   }
 
   @Post('transfer')
-  transferStock(@Body() dto: any) {
-    return this.movementsService.transferStock(dto);
+  transferStock(@Req() req: any, @Body() dto: any) {
+    return this.movementsService.transferStock({ ...dto, branchId: req.user.branchId });
   }
 
   @Get('transfers')
   findAllTransfers(
-    @Query('branchId') branchId?: string,
+    @Req() req: any,
     @Query('status') status?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     return this.movementsService.findAllTransfers({
-      branchId,
+      branchId: req.user.branchId,
       status,
       page: page ? parseInt(page) : undefined,
       limit: limit ? parseInt(limit) : undefined,

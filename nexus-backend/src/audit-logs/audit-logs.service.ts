@@ -5,8 +5,11 @@ import { PrismaService } from '../prisma/prisma.service';
 export class AuditLogsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(limit = 100) {
+  async findAll(branchId: string, limit = 100) {
     const logs = await this.prisma.auditLog.findMany({
+      where: {
+        user: { branchId },
+      },
       include: {
         user: true,
       },
@@ -24,10 +27,10 @@ export class AuditLogsService {
     }));
   }
 
-  async create(dto: any) {
+  async create(dto: any, userId: string) {
     const log = await this.prisma.auditLog.create({
       data: {
-        userId: dto.userId,
+        userId,
         action: dto.action,
         module: dto.module,
         details: dto.details,

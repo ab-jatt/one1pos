@@ -1,0 +1,107 @@
+services:
+  # ──────────────────────────────────────────────
+  # 1. PostgreSQL 16
+  # ──────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: nexus_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-nexus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexus_secret}
+      POSTGRES_DB:       ${POSTGRES_DB:-nexus_pos}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      # pg_isready confirms the Postgres server is accepting connections
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nexus} -d ${POSTGRES_DB:-nexus_pos}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - nexus_network
+
+  # ──────────────────────────────────────────────
+  # 2. NestJS Backend
+  #    Startup order: postgres healthy → prisma migrate deploy → node
+  # ──────────────────────────────────────────────
+  backend:
+    build:
+      context: ./nexus-backend
+      dockerfile: Dockerfile
+    container_name: nexus_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy  # Wait until pg_isready passes
+    environment:
+      NODE_ENV:   production
+      PORT:       8080
+      # Hostname 'postgres' resolves to the postgres container via nexus_network
+      DATABASE_URL: postgresql://${POSTGRES_USER:-nexus}:${POSTGRES_PASSWORD:-nexus_secret}@postgres:5432/${POSTGRES_DB:-nexus_pos}
+      JWT_SECRET:   ${JWT_SECRET:-local-dev-secret-change-in-production}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+    command: >
+      sh -c "node_modules/.bin/prisma migrate deploy &&
+             node prisma/seed.js &&
+             node dist/src/main.js"
+    ports:
+      - "8081:8080"
+    healthcheck:
+      # Hits GET /api/health (defined in AppController)
+      # Uses wget (ships with busybox on Alpine) — no extra tool install
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+    # Uncomment to mount a Firebase service-account JSON for full Admin SDK auth:
+    # volumes:
+    #   - ./firebase-service-account.json:/app/firebase-service-account.json:ro
+    networks:
+      - nexus_network
+
+  # ──────────────────────────────────────────────
+  # 3. React + Vite Frontend  (Nginx, no Node.js at runtime)
+  # ──────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./nexus-enterprise-pos
+      dockerfile: Dockerfile
+      args:
+        # Must be reachable from the USER'S BROWSER — not from inside Docker.
+        # Change to your server's public IP/domain for cloud deployments.
+        # /api suffix is required — NestJS uses app.setGlobalPrefix('api').
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8081/api}
+    container_name: nexus_frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy  # Wait until /api/health returns 200
+    ports:
+      - "5173:80"
+    healthcheck:
+      # nginx:alpine ships without wget/curl; curl is installed in the Dockerfile.
+      # /health is a stub return 200 in nginx.conf — no disk I/O, not SPA-routed.
+      test: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - nexus_network
+
+# ──────────────────────────────────────────────
+# Volumes & Networks
+# ──────────────────────────────────────────────
+volumes:
+  postgres_data:  # Named volume — survives `docker compose down`, removed only by `docker compose down -v`
+
+networks:
+  nexus_network:
+    driver: bridge

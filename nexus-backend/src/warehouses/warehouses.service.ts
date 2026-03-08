@@ -5,11 +5,11 @@ import { PrismaService } from '../prisma/prisma.service';
 export class WarehousesService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(branchId?: string) {
+  async findAll(branchId: string) {
     const warehouses = await this.prisma.warehouse.findMany({
       where: {
         deletedAt: null,
-        ...(branchId ? { branchId } : {}),
+        branchId,
       },
       include: {
         branch: true,
@@ -77,7 +77,7 @@ export class WarehousesService {
     };
   }
 
-  async create(dto: any) {
+  async create(dto: any, branchId: string) {
     // Validate required fields
     if (!dto.name || !dto.name.trim()) {
       throw new BadRequestException('Warehouse name is required');
@@ -85,8 +85,6 @@ export class WarehousesService {
     if (!dto.code || !dto.code.trim()) {
       throw new BadRequestException('Warehouse code is required');
     }
-
-    const branchId = dto.branchId || 'main-branch-id';
 
     // Validate unique code per branch
     const existing = await this.prisma.warehouse.findUnique({

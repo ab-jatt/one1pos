@@ -6,8 +6,9 @@ import { PurchaseOrderStatus } from '@prisma/client';
 export class PurchaseOrdersService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll() {
+  async findAll(branchId: string) {
     const orders = await this.prisma.purchaseOrder.findMany({
+      where: { branchId },
       include: {
         supplier: true,
         items: true,
@@ -84,7 +85,7 @@ export class PurchaseOrdersService {
     };
   }
 
-  async create(dto: any) {
+  async create(dto: any, branchId: string) {
     // Calculate total from items
     let total = 0;
     if (dto.items) {
@@ -98,7 +99,7 @@ export class PurchaseOrdersService {
     const order = await this.prisma.purchaseOrder.create({
       data: {
         supplierId: dto.supplierId,
-        branchId: dto.branchId || 'main-branch-id',
+        branchId,
         status: initialStatus,
         total,
         items: dto.items

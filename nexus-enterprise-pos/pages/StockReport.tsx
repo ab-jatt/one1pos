@@ -87,8 +87,6 @@ const StockReport: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const branchId = localStorage.getItem('branchId') || 'main-branch-id';
-
   // Fetch products for dropdown
   useEffect(() => {
     const fetchProducts = async () => {
@@ -107,10 +105,10 @@ const StockReport: React.FC = () => {
     setIsLoading(true);
     try {
       if (viewMode === 'summary') {
-        const data = await Api.stockReports.getReport(branchId, startDate, endDate, selectedProduct || undefined);
+        const data = await Api.stockReports.getReport(startDate, endDate, selectedProduct || undefined);
         setReportData(data);
       } else {
-        const data = await Api.stockReports.getMovements(branchId, startDate, endDate, selectedProduct || undefined, currentPage, 50);
+        const data = await Api.stockReports.getMovements(startDate, endDate, selectedProduct || undefined, currentPage, 50);
         setMovements(data.movements);
         setTotalPages(data.pagination.totalPages);
       }

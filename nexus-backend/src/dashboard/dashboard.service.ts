@@ -20,13 +20,13 @@ export class DashboardService {
   // ═══════════════════════════════════════════════════════════════
   // OVERVIEW – single endpoint powering ALL dashboard cards
   // ═══════════════════════════════════════════════════════════════
-  async getOverview(startDate?: string, endDate?: string) {
+  async getOverview(branchId: string, startDate?: string, endDate?: string) {
     const dateRange = this.buildDateRange(startDate, endDate);
     const dateFilter = dateRange ? { createdAt: dateRange } : {};
 
     // ── Sales ────────────────────────────────────────────────────
     const orders = await this.prisma.order.findMany({
-      where: { status: 'COMPLETED', ...dateFilter },
+      where: { branchId, status: 'COMPLETED', ...dateFilter },
       include: {
         items: {
           include: { product: { select: { costPrice: true } } },
@@ -57,6 +57,7 @@ export class DashboardService {
 
     const todaySalesAgg = await this.prisma.order.aggregate({
       where: {
+        branchId,
         status: 'COMPLETED',
         createdAt: { gte: todayStart, lte: todayEnd },
       },
@@ -73,6 +74,7 @@ export class DashboardService {
 
     const monthSalesAgg = await this.prisma.order.aggregate({
       where: {
+        branchId,
         status: 'COMPLETED',
         createdAt: { gte: monthStart, lte: todayEnd },
       },
@@ -84,6 +86,7 @@ export class DashboardService {
 
     // ── Stock & inventory value ─────────────────────────────────
     const stocks = await this.prisma.stock.findMany({
+      where: { branchId },
       include: { product: { select: { costPrice: true, price: true } } },
     });
 
@@ -108,7 +111,7 @@ export class DashboardService {
 
     // ── Payable (purchase orders that are PENDING) ──────────────
     const payable = await this.prisma.purchaseOrder.aggregate({
-      where: { status: 'PENDING' },
+      where: { branchId, status: 'PENDING' },
       _sum: { total: true },
       _count: true,
     });
@@ -117,8 +120,8 @@ export class DashboardService {
 
     // ── Expenses ────────────────────────────────────────────────
     const expenseFilter = dateRange
-      ? { type: 'EXPENSE' as const, date: dateRange }
-      : { type: 'EXPENSE' as const };
+      ? { branchId, type: 'EXPENSE' as const, date: dateRange }
+      : { branchId, type: 'EXPENSE' as const };
 
     const expensesAgg = await this.prisma.transaction.aggregate({
       where: expenseFilter,
@@ -165,7 +168,7 @@ export class DashboardService {
   // ═══════════════════════════════════════════════════════════════
   // SALES TREND – daily totals for chart
   // ═══════════════════════════════════════════════════════════════
-  async getSalesTrend(startDate?: string, endDate?: string) {
+  async getSalesTrend(branchId: string, startDate?: string, endDate?: string) {
     let start: Date;
     let end: Date;
 
@@ -184,6 +187,7 @@ export class DashboardService {
 
     const orders = await this.prisma.order.findMany({
       where: {
+        branchId,
         status: 'COMPLETED',
         createdAt: { gte: start, lte: end },
       },
@@ -231,8 +235,8 @@ export class DashboardService {
   // ═══════════════════════════════════════════════════════════════
   // PROFIT TREND – daily profit/loss for chart
   // ═══════════════════════════════════════════════════════════════
-  async getProfitTrend(startDate?: string, endDate?: string) {
-    const salesTrend = await this.getSalesTrend(startDate, endDate);
+  async getProfitTrend(branchId: string, startDate?: string, endDate?: string) {
+    const salesTrend = await this.getSalesTrend(branchId, startDate, endDate);
 
     let start: Date;
     let end: Date;
@@ -252,6 +256,7 @@ export class DashboardService {
     // Get expenses grouped by day
     const expenseTxns = await this.prisma.transaction.findMany({
       where: {
+        branchId,
         type: 'EXPENSE',
         date: { gte: start, lte: end },
       },
@@ -278,8 +283,9 @@ export class DashboardService {
   // ═══════════════════════════════════════════════════════════════
   // STOCK DISTRIBUTION – top categories by stock value
   // ═══════════════════════════════════════════════════════════════
-  async getStockDistribution() {
+  async getStockDistribution(branchId: string) {
     const stocks = await this.prisma.stock.findMany({
+      where: { branchId },
       include: {
         product: {
           select: {
@@ -311,14 +317,14 @@ export class DashboardService {
   // ═══════════════════════════════════════════════════════════════
   // TOP PRODUCTS (kept from original, now supports date filter)
   // ═══════════════════════════════════════════════════════════════
-  async getTopProducts(startDate?: string, endDate?: string) {
+  async getTopProducts(branchId: string, startDate?: string, endDate?: string) {
     const dateRange = this.buildDateRange(startDate, endDate);
 
     const orderFilter: any = {};
     if (dateRange) {
-      orderFilter.order = { createdAt: dateRange, status: 'COMPLETED' };
+      orderFilter.order = { branchId, createdAt: dateRange, status: 'COMPLETED' };
     } else {
-      orderFilter.order = { status: 'COMPLETED' };
+      orderFilter.order = { branchId, status: 'COMPLETED' };
     }
 
     const topProducts = await this.prisma.orderItem.groupBy({
@@ -346,8 +352,9 @@ export class DashboardService {
   // ═══════════════════════════════════════════════════════════════
   // RECENT ORDERS (kept from original)
   // ═══════════════════════════════════════════════════════════════
-  async getRecentOrders(limit = 10) {
+  async getRecentOrders(branchId: string, limit = 10) {
     return this.prisma.order.findMany({
+      where: { branchId },
       take: limit,
       orderBy: { createdAt: 'desc' },
       include: {
@@ -360,8 +367,8 @@ export class DashboardService {
   // ═══════════════════════════════════════════════════════════════
   // LEGACY – keep old getStats so nothing breaks
   // ═══════════════════════════════════════════════════════════════
-  async getStats() {
-    const overview = await this.getOverview();
+  async getStats(branchId: string) {
+    const overview = await this.getOverview(branchId);
     return {
       netSales: overview.netSales,
       grossProfit: overview.grossProfit,
@@ -374,12 +381,13 @@ export class DashboardService {
     };
   }
 
-  async getSalesData() {
+  async getSalesData(branchId: string) {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     const orders = await this.prisma.order.findMany({
       where: {
+        branchId,
         status: 'COMPLETED',
         createdAt: { gte: sevenDaysAgo },
       },

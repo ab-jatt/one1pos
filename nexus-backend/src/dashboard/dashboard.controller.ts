@@ -1,65 +1,66 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, Req } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 
 @Controller('dashboard')
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
-  // ── New comprehensive endpoints ────────────────────────────────
-
   @Get('overview')
   getOverview(
+    @Req() req: any,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.dashboardService.getOverview(startDate, endDate);
+    return this.dashboardService.getOverview(req.user.branchId, startDate, endDate);
   }
 
   @Get('sales-trend')
   getSalesTrend(
+    @Req() req: any,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.dashboardService.getSalesTrend(startDate, endDate);
+    return this.dashboardService.getSalesTrend(req.user.branchId, startDate, endDate);
   }
 
   @Get('profit-trend')
   getProfitTrend(
+    @Req() req: any,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.dashboardService.getProfitTrend(startDate, endDate);
+    return this.dashboardService.getProfitTrend(req.user.branchId, startDate, endDate);
   }
 
   @Get('stock-distribution')
-  getStockDistribution() {
-    return this.dashboardService.getStockDistribution();
+  getStockDistribution(@Req() req: any) {
+    return this.dashboardService.getStockDistribution(req.user.branchId);
   }
 
   @Get('top-products')
   getTopProducts(
+    @Req() req: any,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.dashboardService.getTopProducts(startDate, endDate);
+    return this.dashboardService.getTopProducts(req.user.branchId, startDate, endDate);
   }
 
   @Get('recent-orders')
-  getRecentOrders(@Query('limit') limit?: string) {
+  getRecentOrders(@Req() req: any, @Query('limit') limit?: string) {
     return this.dashboardService.getRecentOrders(
+      req.user.branchId,
       limit ? parseInt(limit, 10) : 10,
     );
   }
 
-  // ── Legacy endpoints (backward compatible) ────────────────────
-
   @Get('stats')
-  getStats() {
-    return this.dashboardService.getStats();
+  getStats(@Req() req: any) {
+    return this.dashboardService.getStats(req.user.branchId);
   }
 
   @Get('sales-data')
-  getSalesData() {
-    return this.dashboardService.getSalesData();
+  getSalesData(@Req() req: any) {
+    return this.dashboardService.getSalesData(req.user.branchId);
   }
 }

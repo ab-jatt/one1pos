@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Req,
 } from '@nestjs/common';
 import { EmployeesService } from './employees.service';
 
@@ -14,8 +15,8 @@ export class EmployeesController {
   constructor(private readonly employeesService: EmployeesService) {}
 
   @Get()
-  findAll() {
-    return this.employeesService.findAll();
+  findAll(@Req() req: any) {
+    return this.employeesService.findAll(req.user.branchId);
   }
 
   @Get(':id')
@@ -24,8 +25,8 @@ export class EmployeesController {
   }
 
   @Post()
-  create(@Body() dto: any) {
-    return this.employeesService.create(dto);
+  create(@Req() req: any, @Body() dto: any) {
+    return this.employeesService.create(dto, req.user.branchId);
   }
 
   @Patch(':id')

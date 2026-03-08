@@ -1,0 +1,53 @@
+# ── Dependencies & build output ──────────────────────────────
+node_modules
+dist
+build
+
+# ── Version control ───────────────────────────────────────────
+.git
+.gitignore
+.gitattributes
+
+# ── Environment secrets (never bake into image) ───────────────
+.env
+.env.*
+!.env.example
+
+# ── Logs (project-specific log directories) ───────────────────
+*.log
+npm-debug.log*
+logs/
+logs2/
+logs3/
+logs4/
+logs5/
+logs6/
+logs7/
+logs8/
+
+# ── Test & coverage ───────────────────────────────────────────
+coverage/
+.nyc_output/
+test/
+**/*.spec.ts
+**/*.e2e-spec.ts
+jest.config.*
+
+# ── Docs & editor files ───────────────────────────────────────
+README.md
+*.md
+.editorconfig
+.vscode/
+.idea/
+
+# ── TypeScript source (compiled to dist/ — not needed at runtime) ──
+# Keep: prisma/, package*.json, tsconfig*.json (needed for build)
+tsconfig.build.json
+eslint.config.mjs
+.prettierrc
+.prettierignore
+
+# ── OS artefacts ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini

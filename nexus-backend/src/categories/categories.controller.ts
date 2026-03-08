@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Req,
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -16,8 +17,8 @@ export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Get()
-  findAll() {
-    return this.categoriesService.findAll();
+  findAll(@Req() req: any) {
+    return this.categoriesService.findAll(req.user.branchId);
   }
 
   @Get(':id')
@@ -26,8 +27,8 @@ export class CategoriesController {
   }
 
   @Post()
-  create(@Body() createCategoryDto: CreateCategoryDto) {
-    return this.categoriesService.create(createCategoryDto);
+  create(@Req() req: any, @Body() createCategoryDto: CreateCategoryDto) {
+    return this.categoriesService.create(createCategoryDto, req.user.branchId);
   }
 
   @Patch(':id')

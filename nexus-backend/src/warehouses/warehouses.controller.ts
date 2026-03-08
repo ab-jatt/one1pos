@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Req } from '@nestjs/common';
 import { WarehousesService } from './warehouses.service';
 
 @Controller('warehouses')
@@ -6,8 +6,8 @@ export class WarehousesController {
   constructor(private readonly warehousesService: WarehousesService) {}
 
   @Get()
-  findAll(@Query('branchId') branchId?: string) {
-    return this.warehousesService.findAll(branchId);
+  findAll(@Req() req: any) {
+    return this.warehousesService.findAll(req.user.branchId);
   }
 
   @Get(':id')
@@ -21,8 +21,8 @@ export class WarehousesController {
   }
 
   @Post()
-  create(@Body() dto: any) {
-    return this.warehousesService.create(dto);
+  create(@Req() req: any, @Body() dto: any) {
+    return this.warehousesService.create(dto, req.user.branchId);
   }
 
   @Patch(':id')

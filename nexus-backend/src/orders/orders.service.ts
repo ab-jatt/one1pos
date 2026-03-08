@@ -8,9 +8,9 @@ import { OrderStatus, PaymentMethod } from '@prisma/client';
 export class OrdersService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(branchId?: string) {
+  async findAll(branchId: string) {
     return this.prisma.order.findMany({
-      where: branchId ? { branchId } : {},
+      where: { branchId },
       include: {
         items: {
           include: {
@@ -66,8 +66,8 @@ export class OrdersService {
     return order;
   }
 
-  async create(createOrderDto: CreateOrderDto) {
-    const { items, customerId, cashierId, branchId, paymentMethod, discount, pointsRedeemed } = createOrderDto;
+  async create(createOrderDto: CreateOrderDto, branchId: string) {
+    const { items, customerId, cashierId, paymentMethod, discount, pointsRedeemed } = createOrderDto;
 
     // Generate order number
     const orderNumber = `ORD-${Date.now().toString().slice(-8)}`;
@@ -400,13 +400,13 @@ export class OrdersService {
     };
   }
 
-  async getStats(branchId?: string) {
+  async getStats(branchId: string) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const orders = await this.prisma.order.findMany({
       where: {
-        branchId: branchId || undefined,
+        branchId,
         status: OrderStatus.COMPLETED,
         createdAt: {
           gte: today,

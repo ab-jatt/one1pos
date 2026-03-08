@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { Product, Customer, Employee, Transaction, PurchaseOrder, AuditLog, Supplier, CartItem, Order, PaymentMethod } from '../types';
 
-// Get API URL from environment variables
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4001/api';
+// Get API URL from environment variables.
+// VITE_API_URL must include the /api prefix to match the NestJS global prefix (app.setGlobalPrefix('api')).
+// Default points to the Docker-mapped host port (8081 → container 8080).
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api';
 
 // Create axios instance
 const apiClient = axios.create({
@@ -13,7 +15,7 @@ const apiClient = axios.create({
   withCredentials: true,
 });
 
-// Attach Firebase ID token to every request
+// Attach JWT token to every request
 apiClient.interceptors.request.use(async (config) => {
   const token = localStorage.getItem('nexus_auth_token');
   if (token) {
@@ -63,14 +65,29 @@ export interface CreateOrderPayload {
   items: { productId: string; quantity: number }[];
   customerId?: string;
   cashierId: string;
-  branchId: string;
   paymentMethod: PaymentMethod;
   discount?: number;
   pointsRedeemed?: number;
 }
 
 export const Api = {
-  // ==================== USERS (for role lookup) ====================
+  // ==================== AUTH ====================
+  auth: {
+    login: async (email: string, password: string): Promise<{ access_token: string; user: { id: string; email: string; name: string; role: string; branchId: string; avatar?: string } }> => {
+      const response = await apiClient.post('/auth/login', { email, password });
+      return response.data;
+    },
+    loginWithGoogle: async (idToken: string): Promise<{ access_token: string; user: { id: string; email: string; name: string; role: string; branchId: string; avatar?: string } }> => {
+      const response = await apiClient.post('/auth/google', { idToken });
+      return response.data;
+    },
+    me: async () => {
+      const response = await apiClient.get('/auth/me');
+      return response.data;
+    },
+  },
+
+  // ==================== USERS ====================
   users: {
     getByEmail: async (email: string): Promise<{ id: string; role: string; name: string; email: string } | null> => {
       try {
@@ -79,6 +96,22 @@ export const Api = {
       } catch {
         return null;
       }
+    },
+    getAll: async () => {
+      const response = await apiClient.get('/users');
+      return response.data;
+    },
+    create: async (data: { name: string; email: string; password: string; role: string }) => {
+      const response = await apiClient.post('/users', data);
+      return response.data;
+    },
+    update: async (id: string, data: { name?: string; email?: string; password?: string; role?: string }) => {
+      const response = await apiClient.patch(`/users/${id}`, data);
+      return response.data;
+    },
+    delete: async (id: string) => {
+      const response = await apiClient.delete(`/users/${id}`);
+      return response.data;
     },
   },
   // ==================== PRODUCTS ====================
@@ -101,7 +134,7 @@ export const Api = {
         throw error;
       }
     },
-    create: async (product: Partial<Product> & { branchId?: string }): Promise<Product> => {
+    create: async (product: Partial<Product>): Promise<Product> => {
       try {
         const response = await apiClient.post('/products', product);
         return response.data;
@@ -110,7 +143,7 @@ export const Api = {
         throw error;
       }
     },
-    update: async (id: string, product: Partial<Product> & { branchId?: string }): Promise<Product> => {
+    update: async (id: string, product: Partial<Product>): Promise<Product> => {
       try {
         const response = await apiClient.patch(`/products/${id}`, product);
         return response.data;
@@ -125,6 +158,28 @@ export const Api = {
         return true;
       } catch (error) {
         console.error('Error deleting product:', error);
+        throw error;
+      }
+    },
+    search: async (q: string): Promise<Product[]> => {
+      try {
+        const response = await apiClient.get(`/products/search?q=${encodeURIComponent(q)}`);
+        return response.data;
+      } catch (error) {
+        console.error('Error searching products:', error);
+        throw error;
+      }
+    },
+    uploadImage: async (file: File): Promise<string> => {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await apiClient.post('/products/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data.url as string;
+      } catch (error) {
+        console.error('Error uploading product image:', error);
         throw error;
       }
     },
@@ -270,7 +325,7 @@ export const Api = {
 
   // ==================== STOCK LEDGER ====================
   stockLedger: {
-    getLedger: async (productId: string, branchId: string, startDate?: string, endDate?: string): Promise<{
+    getLedger: async (productId: string, startDate?: string, endDate?: string): Promise<{
       product: {
         id: string;
         name: string;
@@ -294,7 +349,6 @@ export const Api = {
     }> => {
       try {
         const params = new URLSearchParams();
-        params.append('branchId', branchId);
         if (startDate) params.append('startDate', startDate);
         if (endDate) params.append('endDate', endDate);
         const response = await apiClient.get(`/products/${productId}/ledger?${params.toString()}`);
@@ -308,10 +362,9 @@ export const Api = {
 
   // ==================== STOCK REPORTS ====================
   stockReports: {
-    getReport: async (branchId: string, startDate?: string, endDate?: string, productId?: string) => {
+    getReport: async (startDate?: string, endDate?: string, productId?: string) => {
       try {
         const params = new URLSearchParams();
-        params.append('branchId', branchId);
         if (startDate) params.append('startDate', startDate);
         if (endDate) params.append('endDate', endDate);
         if (productId) params.append('productId', productId);
@@ -323,10 +376,9 @@ export const Api = {
       }
     },
 
-    getMovements: async (branchId: string, startDate?: string, endDate?: string, productId?: string, page?: number, limit?: number) => {
+    getMovements: async (startDate?: string, endDate?: string, productId?: string, page?: number, limit?: number) => {
       try {
         const params = new URLSearchParams();
-        params.append('branchId', branchId);
         if (startDate) params.append('startDate', startDate);
         if (endDate) params.append('endDate', endDate);
         if (productId) params.append('productId', productId);
@@ -340,11 +392,9 @@ export const Api = {
       }
     },
 
-    getDailySummary: async (branchId: string, date: string) => {
+    getDailySummary: async (date: string) => {
       try {
-        const params = new URLSearchParams();
-        params.append('branchId', branchId);
-        const response = await apiClient.get(`/stock-reports/daily/${date}?${params.toString()}`);
+        const response = await apiClient.get(`/stock-reports/daily/${date}`);
         return response.data;
       } catch (error) {
         console.error('Error fetching daily summary:', error);
@@ -353,7 +403,6 @@ export const Api = {
     },
 
     createAdjustment: async (data: {
-      branchId?: string;
       productId: string;
       adjustmentType: 'IN' | 'OUT';
       quantity: number;
@@ -371,10 +420,9 @@ export const Api = {
 
   // ==================== ORDERS ====================
   orders: {
-    getAll: async (branchId?: string): Promise<Order[]> => {
+    getAll: async (): Promise<Order[]> => {
       try {
-        const params = branchId ? { branchId } : {};
-        const response = await apiClient.get('/orders', { params });
+        const response = await apiClient.get('/orders');
         return response.data;
       } catch (error) {
         console.error('Error fetching orders:', error);
@@ -421,10 +469,9 @@ export const Api = {
         throw error;
       }
     },
-    getStats: async (branchId?: string) => {
+    getStats: async () => {
       try {
-        const params = branchId ? { branchId } : {};
-        const response = await apiClient.get('/orders/stats', { params });
+        const response = await apiClient.get('/orders/stats');
         return response.data;
       } catch (error) {
         console.error('Error fetching order stats:', error);
@@ -437,7 +484,6 @@ export const Api = {
   exchanges: {
     create: async (payload: {
       originalOrderId: string;
-      branchId: string;
       customerId?: string;
       processedById?: string;
       returnedItems: Array<{ productId: string; quantity: number; unitPrice: number }>;
@@ -457,7 +503,6 @@ export const Api = {
       }
     },
     getAll: async (params?: {
-      branchId?: string;
       customerId?: string;
       startDate?: string;
       endDate?: string;
@@ -840,9 +885,8 @@ export const Api = {
   // WAREHOUSE MANAGEMENT
   // ═══════════════════════════════════════════════════════════════
   warehouses: {
-    getAll: async (branchId?: string) => {
-      const params = branchId ? { branchId } : {};
-      const response = await apiClient.get('/warehouses', { params });
+    getAll: async () => {
+      const response = await apiClient.get('/warehouses');
       return response.data;
     },
     getById: async (id: string) => {
@@ -969,6 +1013,22 @@ export const Api = {
     },
     transfers: async (filters?: any) => {
       const response = await apiClient.get('/warehouse-reports/transfers', { params: filters });
+      return response.data;
+    },
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // POS HARDWARE
+  // ═══════════════════════════════════════════════════════════════
+  pos: {
+    /**
+     * Request the ESC/POS cash drawer open command from the backend.
+     * Returns { command: string (base64), encoding: 'base64' }.
+     * The caller is responsible for forwarding the decoded bytes to the
+     * receipt printer via QZ Tray.
+     */
+    openDrawer: async (): Promise<{ command: string; encoding: string }> => {
+      const response = await apiClient.post('/pos/open-drawer');
       return response.data;
     },
   },

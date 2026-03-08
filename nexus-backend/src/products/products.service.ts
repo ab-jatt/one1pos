@@ -5,16 +5,29 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(branchId?: string) {
+  private async generateProductCode(): Promise<string> {
+    const last = await this.prisma.product.findFirst({
+      where: { productCode: { startsWith: 'PRD-' } },
+      orderBy: { productCode: 'desc' },
+      select: { productCode: true },
+    });
+    const nextNum = last?.productCode
+      ? parseInt(last.productCode.replace('PRD-', ''), 10) + 1
+      : 1;
+    const code = `PRD-${String(nextNum).padStart(6, '0')}`;
+    // Safety check: if this code is already taken (race condition), fall back to timestamp
+    const exists = await this.prisma.product.findUnique({ where: { productCode: code } });
+    return exists ? `PRD-${Date.now()}` : code;
+  }
+
+  async findAll(branchId: string) {
     const products = await this.prisma.product.findMany({
       where: { deletedAt: null },
       include: {
         category: true,
-        stocks: branchId
-          ? {
-              where: { branchId },
-            }
-          : true,
+        stocks: {
+          where: { branchId },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -24,6 +37,8 @@ export class ProductsService {
       id: product.id,
       name: product.name,
       sku: product.sku,
+      productCode: product.productCode,
+      barcode: product.barcode,
       description: product.description,
       image: product.image,
       price: Number(product.price),
@@ -53,6 +68,8 @@ export class ProductsService {
       id: product.id,
       name: product.name,
       sku: product.sku,
+      productCode: product.productCode,
+      barcode: product.barcode,
       description: product.description,
       image: product.image,
       price: Number(product.price),
@@ -65,11 +82,51 @@ export class ProductsService {
     };
   }
 
+  async search(q: string, branchId: string) {
+    const products = await this.prisma.product.findMany({
+      where: {
+        deletedAt: null,
+        OR: [
+          { productCode: q },
+          { barcode: q },
+          { sku: q },
+          { name: { contains: q, mode: 'insensitive' } },
+        ],
+      },
+      include: {
+        category: true,
+        stocks: { where: { branchId } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return products.map((product) => ({
+      id: product.id,
+      name: product.name,
+      sku: product.sku,
+      productCode: product.productCode,
+      barcode: product.barcode,
+      description: product.description,
+      image: product.image,
+      price: Number(product.price),
+      costPrice: Number(product.costPrice),
+      category: product.category?.name || 'Uncategorized',
+      categoryId: product.categoryId,
+      stock: product.stocks.reduce((sum, s) => sum + s.quantity, 0),
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
+    }));
+  }
+
   async create(data: any) {
+    const productCode = data.productCode || (await this.generateProductCode());
+
     const product = await this.prisma.product.create({
       data: {
         name: data.name,
         sku: data.sku,
+        productCode,
+        barcode: data.barcode || null,
         description: data.description,
         image: data.image,
         price: data.price,
@@ -103,6 +160,8 @@ export class ProductsService {
       data: {
         name: data.name,
         sku: data.sku,
+        ...(data.productCode !== undefined && { productCode: data.productCode }),
+        ...(data.barcode !== undefined && { barcode: data.barcode || null }),
         description: data.description,
         image: data.image,
         price: data.price,

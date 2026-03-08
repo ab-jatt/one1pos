@@ -78,7 +78,7 @@ const Settings: React.FC = () => {
 
   // --- USERS STATE ---
   const [usersList, setUsersList] = useState<UserType[]>([
-    { id: '1', name: 'John Admin', email: 'admin@one1pos.com', role: Role.ADMIN, permissions: ['inventory.view', 'inventory.manage', 'inventory.delete', 'pos.operate', 'pos.refund', 'customers.view', 'customers.manage', 'suppliers.view', 'suppliers.manage', 'reports.view', 'financials.view', 'settings.manage', 'users.manage'] },
+    { id: '1', name: 'John Admin', email: 'admin@one1pos.com', role: Role.OWNER, permissions: ['inventory.view', 'inventory.manage', 'inventory.delete', 'pos.operate', 'pos.refund', 'customers.view', 'customers.manage', 'suppliers.view', 'suppliers.manage', 'reports.view', 'financials.view', 'settings.manage', 'users.manage'] },
     { id: '2', name: 'Sarah Manager', email: 'manager@one1pos.com', role: Role.MANAGER, permissions: ['inventory.view', 'inventory.manage', 'pos.operate', 'pos.refund', 'customers.view', 'customers.manage', 'suppliers.view', 'suppliers.manage', 'reports.view'] },
     { id: '3', name: 'Kyle Cashier', email: 'cashier@one1pos.com', role: Role.CASHIER, permissions: ['pos.operate', 'customers.view', 'inventory.view'] },
   ]);
@@ -662,7 +662,7 @@ const Settings: React.FC = () => {
                             >
                                 <Edit className="w-4 h-4" /> {t('access')}
                             </button>
-                            {user.role !== Role.ADMIN && (
+                            {user.role !== Role.OWNER && (
                                 <button 
                                     onClick={() => handleDeleteUser(user.id)}
                                     className="p-2 text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
@@ -1060,7 +1060,7 @@ const Settings: React.FC = () => {
                       options={[
                         { value: Role.CASHIER, label: 'Cashier (Restricted)' },
                         { value: Role.MANAGER, label: 'Manager (Operational)' },
-                        { value: Role.ADMIN, label: 'Administrator (Full Access)' },
+                        { value: Role.OWNER, label: 'Administrator (Full Access)' },
                       ]}
                       value={newUser.role}
                       onChange={(val) => setNewUser({...newUser, role: val as Role})}

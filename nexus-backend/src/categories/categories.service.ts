@@ -7,8 +7,9 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 export class CategoriesService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll() {
+  async findAll(branchId: string) {
     return this.prisma.category.findMany({
+      where: { branchId },
       include: {
         _count: {
           select: { products: true },
@@ -33,9 +34,12 @@ export class CategoriesService {
     return category;
   }
 
-  async create(createCategoryDto: CreateCategoryDto) {
+  async create(createCategoryDto: CreateCategoryDto, branchId: string) {
     return this.prisma.category.create({
-      data: createCategoryDto,
+      data: {
+        name: createCategoryDto.name,
+        branchId,
+      },
     });
   }
 

@@ -14,7 +14,7 @@ export enum OrderStatus {
 }
 
 export enum Role {
-  ADMIN = 'ADMIN',
+  OWNER = 'OWNER',
   MANAGER = 'MANAGER',
   CASHIER = 'CASHIER'
 }
@@ -25,6 +25,7 @@ export interface User {
   email: string;
   role: Role;
   avatar?: string;
+  branchId?: string;
   permissions: string[];
 }
 
@@ -37,6 +38,8 @@ export interface Product {
   image: string;
   stock: number;
   sku: string;
+  productCode?: string;
+  barcode?: string;
 }
 
 export interface CartItem extends Product {

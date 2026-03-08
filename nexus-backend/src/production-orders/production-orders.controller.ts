@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Req } from '@nestjs/common';
 import { ProductionOrdersService } from './production-orders.service';
 
 @Controller('production-orders')
@@ -7,13 +7,13 @@ export class ProductionOrdersController {
 
   @Get()
   findAll(
-    @Query('branchId') branchId?: string,
+    @Req() req: any,
     @Query('status') status?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     return this.productionService.findAll({
-      branchId,
+      branchId: req.user.branchId,
       status,
       page: page ? parseInt(page) : undefined,
       limit: limit ? parseInt(limit) : undefined,
@@ -26,8 +26,8 @@ export class ProductionOrdersController {
   }
 
   @Post()
-  create(@Body() dto: any) {
-    return this.productionService.create(dto);
+  create(@Req() req: any, @Body() dto: any) {
+    return this.productionService.create({ ...dto, branchId: req.user.branchId });
   }
 
   @Patch(':id')

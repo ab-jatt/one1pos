@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Req } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 
 @Controller('transactions')
@@ -6,13 +6,13 @@ export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 
   @Get()
-  findAll() {
-    return this.transactionsService.findAll();
+  findAll(@Req() req: any) {
+    return this.transactionsService.findAll(req.user.branchId);
   }
 
   @Get('stats')
-  getStats() {
-    return this.transactionsService.getFinancialStats();
+  getStats(@Req() req: any) {
+    return this.transactionsService.getFinancialStats(req.user.branchId);
   }
 
   @Get(':id')
@@ -21,7 +21,7 @@ export class TransactionsController {
   }
 
   @Post()
-  create(@Body() dto: any) {
-    return this.transactionsService.create(dto);
+  create(@Req() req: any, @Body() dto: any) {
+    return this.transactionsService.create(dto, req.user.branchId);
   }
 }

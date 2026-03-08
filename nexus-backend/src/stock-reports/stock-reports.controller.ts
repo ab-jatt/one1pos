@@ -1,41 +1,31 @@
-import { Controller, Get, Post, Query, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Query, Body, Param, Req } from '@nestjs/common';
 import { StockReportsService } from './stock-reports.service';
 
 @Controller('stock-reports')
 export class StockReportsController {
   constructor(private readonly stockReportsService: StockReportsService) {}
 
-  /**
-   * GET /api/stock-reports
-   * Get comprehensive stock report with date filters and optional product filter
-   */
   @Get()
   getStockReport(
-    @Query('branchId') branchId: string,
+    @Req() req: any,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('productId') productId?: string,
   ) {
-    const branch = branchId || 'main-branch-id';
-    return this.stockReportsService.getStockReport(branch, startDate, endDate, productId);
+    return this.stockReportsService.getStockReport(req.user.branchId, startDate, endDate, productId);
   }
 
-  /**
-   * GET /api/stock-reports/movements
-   * Get all stock movements with pagination
-   */
   @Get('movements')
   getAllMovements(
-    @Query('branchId') branchId: string,
+    @Req() req: any,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('productId') productId?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const branch = branchId || 'main-branch-id';
     return this.stockReportsService.getAllMovements(
-      branch,
+      req.user.branchId,
       startDate,
       endDate,
       productId,
@@ -44,42 +34,31 @@ export class StockReportsController {
     );
   }
 
-  /**
-   * GET /api/stock-reports/daily/:date
-   * Get daily stock summary for a specific date
-   */
   @Get('daily/:date')
   getDailySummary(
+    @Req() req: any,
     @Param('date') date: string,
-    @Query('branchId') branchId: string,
   ) {
-    const branch = branchId || 'main-branch-id';
-    return this.stockReportsService.getDailyStockSummary(branch, date);
+    return this.stockReportsService.getDailyStockSummary(req.user.branchId, date);
   }
 
-  /**
-   * POST /api/stock-reports/adjustment
-   * Create a manual stock adjustment
-   */
   @Post('adjustment')
   createAdjustment(
+    @Req() req: any,
     @Body() body: {
-      branchId?: string;
       productId: string;
       adjustmentType: 'IN' | 'OUT';
       quantity: number;
       reason: string;
-      userId?: string;
     },
   ) {
-    const branchId = body.branchId || 'main-branch-id';
     return this.stockReportsService.createAdjustment(
-      branchId,
+      req.user.branchId,
       body.productId,
       body.adjustmentType,
       body.quantity,
       body.reason,
-      body.userId,
+      req.user.userId,
     );
   }
 }

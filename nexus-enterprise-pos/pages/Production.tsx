@@ -72,7 +72,6 @@ const Production: React.FC = () => {
         quantity: createForm.quantity,
         notes: createForm.notes,
         items: validItems,
-        branchId: 'main-branch-id',
       });
       setShowCreateModal(false);
       setCreateForm({ productId: '', quantity: 1, notes: '', items: [{ productId: '', requiredQty: 1, unitCost: 0 }] });

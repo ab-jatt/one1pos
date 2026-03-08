@@ -1,11 +1,60 @@
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Search, Grid, Trash2, Plus, Minus, User, Tag, Wifi, Printer, RefreshCw, Percent, X, RotateCcw, Check, FileText, ScanLine, Box, ChevronRight, Zap, Calculator, Hexagon, Star, Users, Phone, Loader2 } from 'lucide-react';
 import { Api, Category } from '../services/api';
 import { Product, CartItem, Customer, PaymentMethod, Order } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
 import SuccessModal from '../components/ui/SuccessModal';
+
+// ─── QZ Tray helpers ──────────────────────────────────────────────────────────
+// QZ Tray is a locally-installed desktop app that bridges the browser to USB /
+// network receipt printers.  We lazy-load its JS client from the official CDN
+// the first time the POS screen mounts; if QZ Tray is not running on the
+// operator's machine the helpers fail silently — the transaction still goes
+// through without blocking the POS flow.
+
+declare global {
+  interface Window {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    qz: any;
+  }
+}
+
+function loadQzScript(): Promise<void> {
+  return new Promise((resolve) => {
+    if (window.qz) { resolve(); return; }
+    const existing = document.getElementById('qz-tray-script');
+    if (existing) { existing.addEventListener('load', () => resolve()); return; }
+    const script = document.createElement('script');
+    script.id = 'qz-tray-script';
+    script.src = 'https://cdn.jsdelivr.net/npm/qz-tray@2.2.4/qz-tray.js';
+    script.crossOrigin = 'anonymous';
+    script.onload = () => resolve();
+    script.onerror = () => resolve(); // fail silently
+    document.head.appendChild(script);
+  });
+}
+
+async function sendDrawerOpenCommand(base64Command: string): Promise<void> {
+  await loadQzScript();
+  const qz = window.qz;
+  if (!qz) return;
+  try {
+    if (!qz.websocket.isActive()) {
+      await qz.websocket.connect();
+    }
+    const printers = await qz.printers.find();
+    if (!printers || printers.length === 0) return;
+
+    const config = qz.configs.create(printers[0]);
+    const data = [{ type: 'raw', format: 'base64', data: base64Command }];
+    await qz.print(config, data);
+  } catch {
+    // QZ Tray not running or no printer — fail silently so POS flow is unaffected
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface TransactionSnapshot {
     items: CartItem[];
@@ -163,6 +212,10 @@ const POS: React.FC = () => {
 
   // Fetch products, categories, and customers on mount
   useEffect(() => {
+    // Pre-load QZ Tray script in the background so the first payment doesn't
+    // trigger a network round-trip.
+    loadQzScript();
+
     const fetchData = async () => {
       setIsLoading(true);
       try {
@@ -370,8 +423,12 @@ const POS: React.FC = () => {
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
-      const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            product.sku.toLowerCase().includes(searchQuery.toLowerCase());
+      const q = searchQuery.toLowerCase();
+      const matchesSearch = !q ||
+        product.name.toLowerCase().includes(q) ||
+        (product.sku?.toLowerCase() || '').includes(q) ||
+        (product.productCode?.toLowerCase() || '').includes(q) ||
+        (product.barcode?.toLowerCase() || '').includes(q);
       return matchesCategory && matchesSearch;
     });
   }, [selectedCategory, searchQuery, products]);
@@ -489,7 +546,6 @@ const POS: React.FC = () => {
         })),
         customerId: selectedCustomer.id !== 'walk-in' ? selectedCustomer.id : undefined,
         cashierId: 'cashier-user-id', // Default cashier from seed data
-        branchId: 'main-branch-id', // Default branch
         paymentMethod: method,
         discount: effectiveDiscount,
         pointsRedeemed: pointsRedeemed,
@@ -536,6 +592,11 @@ const POS: React.FC = () => {
       // Close payment modal and show receipt prompt first
       setIsPaymentModalOpen(false);
       setIsReceiptPromptOpen(true);
+
+      // Open the cash drawer via QZ Tray (non-blocking — fires-and-forgets)
+      Api.pos.openDrawer()
+        .then(({ command }) => sendDrawerOpenCommand(command))
+        .catch(() => { /* QZ Tray unavailable — ignore */ });
 
       // Refresh products to get updated stock (non-blocking)
       try {
@@ -730,7 +791,9 @@ const POS: React.FC = () => {
   // Filtered products for exchange search
   const exchangeFilteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(exchangeSearchQuery.toLowerCase()) ||
-    p.sku?.toLowerCase().includes(exchangeSearchQuery.toLowerCase())
+    (p.sku?.toLowerCase() || '').includes(exchangeSearchQuery.toLowerCase()) ||
+    (p.productCode?.toLowerCase() || '').includes(exchangeSearchQuery.toLowerCase()) ||
+    (p.barcode?.toLowerCase() || '').includes(exchangeSearchQuery.toLowerCase())
   ).slice(0, 10);
 
   const handleProcessRefund = async () => {
@@ -825,7 +888,6 @@ const POS: React.FC = () => {
 
       const result = await Api.exchanges.create({
         originalOrderId: foundOrder.id,
-        branchId: 'main-branch-id',
         customerId: foundOrder.customerId !== 'WALK-IN' ? foundOrder.customerId : undefined,
         returnedItems,
         issuedItems,
@@ -972,6 +1034,20 @@ const POS: React.FC = () => {
                className="w-full pl-10 pr-4 py-3 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 font-mono text-sm relative z-10"
                value={searchQuery}
                onChange={(e) => setSearchQuery(e.target.value)}
+               onKeyDown={(e) => {
+                 if (e.key !== 'Enter') return;
+                 const q = searchQuery.trim();
+                 if (!q) return;
+                 // Exact match by barcode, productCode, or sku (barcode scanner input)
+                 const exact = products.find(p =>
+                   p.barcode === q || p.productCode === q || p.sku === q
+                 );
+                 if (exact) {
+                   addToCart(exact);
+                   setSearchQuery('');
+                   e.preventDefault();
+                 }
+               }}
              />
            </div>
            

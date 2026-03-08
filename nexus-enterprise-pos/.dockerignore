@@ -1,0 +1,41 @@
+# ── Dependencies & build output ──────────────────────────────
+node_modules
+dist
+build
+
+# ── Version control ───────────────────────────────────────────
+.git
+.gitignore
+.gitattributes
+
+# ── Environment secrets ───────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Logs ──────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+logs/
+
+# ── Test & coverage ───────────────────────────────────────────
+coverage/
+.nyc_output/
+**/*.test.ts
+**/*.spec.ts
+
+# ── Docs & editor files ───────────────────────────────────────
+README.md
+*.md
+.editorconfig
+.vscode/
+.idea/
+
+# ── Vite / TS tooling (only needed locally) ───────────────────
+bundle-report.html
+*.tsbuildinfo
+
+# ── OS artefacts ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini

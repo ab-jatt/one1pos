@@ -9,6 +9,14 @@ export class CreateProductDto {
 
   @IsString()
   @IsOptional()
+  productCode?: string;
+
+  @IsString()
+  @IsOptional()
+  barcode?: string;
+
+  @IsString()
+  @IsOptional()
   description?: string;
 
   @IsString()

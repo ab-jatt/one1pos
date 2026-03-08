@@ -6,29 +6,23 @@ import {
   Param,
   Query,
   Patch,
+  Req,
 } from '@nestjs/common';
 import { ExchangesService } from './exchanges.service';
 import { CreateExchangeDto } from './dto/create-exchange.dto';
 
-@Controller('api/exchanges')
+@Controller('exchanges')
 export class ExchangesController {
   constructor(private readonly exchangesService: ExchangesService) {}
 
-  /**
-   * Create a new exchange transaction
-   * Supports optional amount adjustment with mandatory reason
-   */
   @Post()
-  create(@Body() createExchangeDto: CreateExchangeDto) {
-    return this.exchangesService.create(createExchangeDto);
+  create(@Req() req: any, @Body() createExchangeDto: CreateExchangeDto) {
+    return this.exchangesService.create({ ...createExchangeDto, branchId: req.user.branchId });
   }
 
-  /**
-   * Get all exchanges with optional filters
-   */
   @Get()
   findAll(
-    @Query('branchId') branchId?: string,
+    @Req() req: any,
     @Query('customerId') customerId?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -37,7 +31,7 @@ export class ExchangesController {
     @Query('limit') limit?: string,
   ) {
     return this.exchangesService.findAll({
-      branchId,
+      branchId: req.user.branchId,
       customerId,
       startDate,
       endDate,
@@ -47,60 +41,41 @@ export class ExchangesController {
     });
   }
 
-  /**
-   * Get exchange by ID
-   */
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.exchangesService.findOne(id);
   }
 
-  /**
-   * Get exchange by exchange number
-   */
   @Get('number/:exchangeNumber')
   findByExchangeNumber(@Param('exchangeNumber') exchangeNumber: string) {
     return this.exchangesService.findByExchangeNumber(exchangeNumber);
   }
 
-  /**
-   * Cancel an exchange
-   * Reverses all stock movements and credit transactions
-   */
   @Patch(':id/cancel')
   cancel(
-    @Param('id') id: string, 
+    @Req() req: any,
+    @Param('id') id: string,
     @Body('reason') reason: string,
-    @Body('cancelledById') cancelledById?: string,
   ) {
-    return this.exchangesService.cancel(id, reason || 'No reason provided', cancelledById);
+    return this.exchangesService.cancel(id, reason || 'No reason provided', req.user.userId);
   }
 
-  /**
-   * Adjust the exchange amount after creation
-   * Only allowed for exchanges with PENDING payment status
-   * Requires mandatory adjustment reason
-   */
   @Patch(':id/adjust')
   adjustAmount(
+    @Req() req: any,
     @Param('id') id: string,
     @Body('adjustedAmount') adjustedAmount: number,
     @Body('adjustmentReason') adjustmentReason: string,
-    @Body('adjustedById') adjustedById: string,
   ) {
-    return this.exchangesService.adjustAmount(id, adjustedAmount, adjustmentReason, adjustedById);
+    return this.exchangesService.adjustAmount(id, adjustedAmount, adjustmentReason, req.user.userId);
   }
 
-  /**
-   * Process payment for a pending exchange
-   * Handles cash, card, or store credit payments
-   */
   @Patch(':id/payment')
   processPayment(
+    @Req() req: any,
     @Param('id') id: string,
     @Body('paymentMethod') paymentMethod: 'CASH' | 'CARD' | 'CREDIT',
-    @Body('processedById') processedById?: string,
   ) {
-    return this.exchangesService.processPayment(id, paymentMethod, processedById);
+    return this.exchangesService.processPayment(id, paymentMethod, req.user.userId);
   }
 }

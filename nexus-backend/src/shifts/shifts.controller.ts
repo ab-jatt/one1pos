@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Req } from '@nestjs/common';
 import { ShiftsService } from './shifts.service';
 
 @Controller('shifts')
@@ -11,8 +11,8 @@ export class ShiftsController {
   }
 
   @Get()
-  findAll(@Query('employeeId') employeeId?: string) {
-    return this.shiftsService.findAll(employeeId);
+  findAll(@Req() req: any, @Query('employeeId') employeeId?: string) {
+    return this.shiftsService.findAll(req.user.branchId, employeeId);
   }
 
   @Get(':id')

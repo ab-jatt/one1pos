@@ -43,8 +43,8 @@ export class CreateOrderDto {
   cashierId: string;
 
   @IsString()
-  @IsNotEmpty()
-  branchId: string;
+  @IsOptional()
+  branchId?: string;
 
   @IsEnum(PaymentMethodDto)
   @IsNotEmpty()

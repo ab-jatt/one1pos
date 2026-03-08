@@ -88,7 +88,6 @@ const StockMovements: React.FC = () => {
         quantity: adjustForm.quantity,
         unitCost: adjustForm.unitCost,
         reason: adjustForm.reason,
-        branchId: 'main-branch-id',
       });
       setShowAdjustModal(false);
       setAdjustForm({ warehouseId: '', productId: '', type: 'ADJUSTMENT_IN', quantity: 1, unitCost: 0, reason: '' });

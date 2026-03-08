@@ -11,23 +11,34 @@ async function bootstrap() {
     transform: true,
   }));
   
-  // Enable CORS for frontend (allow multiple ports for dev)
+  // Enable CORS. In Docker/production set CORS_ORIGIN to a comma-separated
+  // list of allowed browser origins (e.g. "http://localhost:5173").
+  const envOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
+    : [];
+
+  const defaultOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'http://localhost:5173',
+    'http://localhost:8080',
+    'http://localhost:8081',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+    'http://127.0.0.1:3002',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:8080',
+    'http://127.0.0.1:8081',
+    'http://192.168.0.102:3000',
+    'http://192.168.0.102:3001',
+    'http://192.168.0.102:3002',
+    'http://192.168.0.102:8080',
+    'http://192.168.0.102:80',
+  ];
+
   app.enableCors({
-    origin: [
-      'http://localhost:3000', 
-      'http://localhost:3001', 
-      'http://localhost:3002',
-      'http://localhost:8080',
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:3001',
-      'http://127.0.0.1:3002',
-      'http://127.0.0.1:8080',
-      'http://192.168.0.102:3000',
-      'http://192.168.0.102:3001',
-      'http://192.168.0.102:3002',
-      'http://192.168.0.102:8080',
-      'http://192.168.0.102:80',
-    ],
+    origin: [...new Set([...defaultOrigins, ...envOrigins])],
     credentials: true,
   });
   

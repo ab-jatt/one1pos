@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '../components/ui/Card';
 import { AccessGate } from '../components/ui/AccessGate';
 import { Api, Category } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
-import { Package, Search, Filter, Download, Plus, X, Image as ImageIcon, Save, Trash2, Edit2, RefreshCw, AlertTriangle, TrendingUp, DollarSign, Box, Loader2, Calendar } from 'lucide-react';
+import { Package, Search, Filter, Download, Plus, X, Image as ImageIcon, Save, Trash2, Edit2, RefreshCw, AlertTriangle, TrendingUp, DollarSign, Box, Loader2, Calendar, Upload } from 'lucide-react';
 import Dropdown from '../components/ui/Dropdown';
 import { Product, Role } from '../types';
 
@@ -30,6 +30,8 @@ const Inventory: React.FC = () => {
     costPrice: 0,
     stock: 0,
     sku: '',
+    productCode: '',
+    barcode: '',
     image: 'https://picsum.photos/200/200?random=' + Math.floor(Math.random() * 1000)
   });
 
@@ -47,6 +49,12 @@ const Inventory: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [ledgerData, setLedgerData] = useState<any>(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
+
+  // Image upload state & refs
+  const [isUploadingAddImage, setIsUploadingAddImage] = useState(false);
+  const [isUploadingEditImage, setIsUploadingEditImage] = useState(false);
+  const addImageInputRef = useRef<HTMLInputElement>(null);
+  const editImageInputRef = useRef<HTMLInputElement>(null);
   const [ledgerStartDate, setLedgerStartDate] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -77,8 +85,12 @@ const Inventory: React.FC = () => {
   const categoryNames = ['All', ...categories.map(c => c.name)];
 
   const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          p.sku.toLowerCase().includes(searchTerm.toLowerCase());
+    const q = searchTerm.toLowerCase();
+    const matchesSearch = !q ||
+      p.name.toLowerCase().includes(q) ||
+      (p.sku?.toLowerCase() || '').includes(q) ||
+      (p.productCode?.toLowerCase() || '').includes(q) ||
+      (p.barcode?.toLowerCase() || '').includes(q);
     const matchesCategory = categoryFilter === 'All' || p.category === categoryFilter;
     
     let matchesStock = true;
@@ -110,8 +122,7 @@ const Inventory: React.FC = () => {
     setIsLedgerModalOpen(true);
     setLedgerLoading(true);
     try {
-      const branchId = localStorage.getItem('branchId') || 'main-branch-id';
-      const data = await Api.stockLedger.getLedger(product.id, branchId, ledgerStartDate, ledgerEndDate);
+      const data = await Api.stockLedger.getLedger(product.id, ledgerStartDate, ledgerEndDate);
       setLedgerData(data);
     } catch (error) {
       console.error('Error fetching stock ledger:', error);
@@ -125,8 +136,7 @@ const Inventory: React.FC = () => {
     if (!selectedProduct) return;
     setLedgerLoading(true);
     try {
-      const branchId = localStorage.getItem('branchId') || 'main-branch-id';
-      const data = await Api.stockLedger.getLedger(selectedProduct.id, branchId, ledgerStartDate, ledgerEndDate);
+      const data = await Api.stockLedger.getLedger(selectedProduct.id, ledgerStartDate, ledgerEndDate);
       setLedgerData(data);
     } catch (error) {
       console.error('Error refreshing ledger:', error);
@@ -184,12 +194,13 @@ const Inventory: React.FC = () => {
       const productData = {
         name: newProduct.name!,
         sku: newProduct.sku!,
+        ...(newProduct.productCode?.trim() && { productCode: newProduct.productCode.trim() }),
+        ...(newProduct.barcode?.trim() && { barcode: newProduct.barcode.trim() }),
         price: Number(newProduct.price),
         costPrice: Number(newProduct.costPrice) || 0,
         categoryId: category?.id || categories[0]?.id,
         image: newProduct.image || `https://picsum.photos/200/200?random=${Math.floor(Math.random() * 1000)}`,
         stock: Number(newProduct.stock) || 0,
-        branchId: 'main-branch-id', // Default branch
       };
 
       const createdProduct = await Api.products.create(productData);
@@ -202,6 +213,8 @@ const Inventory: React.FC = () => {
         costPrice: 0,
         stock: 0,
         sku: '',
+        productCode: '',
+        barcode: '',
         image: 'https://picsum.photos/200/200?random=' + Math.floor(Math.random() * 1000)
       });
     } catch (error) {
@@ -232,12 +245,13 @@ const Inventory: React.FC = () => {
       const updateData = {
         name: editingProduct.name,
         sku: editingProduct.sku,
+        productCode: editingProduct.productCode?.trim() || undefined,
+        barcode: editingProduct.barcode?.trim() || undefined,
         price: Number(editingProduct.price),
         costPrice: Number(editingProduct.costPrice),
         categoryId: category?.id || editingProduct.categoryId,
         image: editingProduct.image,
         stock: Number(editingProduct.stock),
-        branchId: 'main-branch-id', // Default branch
       };
 
       const updatedProduct = await Api.products.update(editingProduct.id, updateData);
@@ -247,6 +261,22 @@ const Inventory: React.FC = () => {
     } catch (error) {
       console.error('Error updating product:', error);
       alert('Failed to update product');
+    }
+  };
+
+  const handleImageUpload = async (
+    file: File,
+    setUrl: (url: string) => void,
+    setUploading: (v: boolean) => void,
+  ) => {
+    setUploading(true);
+    try {
+      const url = await Api.products.uploadImage(file);
+      setUrl(url);
+    } catch {
+      alert('Failed to upload image. Please check your connection and try again.');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -437,13 +467,16 @@ const Inventory: React.FC = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden border border-neutral-300 dark:border-neutral-700 relative group-hover:border-sky-500/50 transition-colors">
-                        <img src={product.image} alt="" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
+                        <img src={product.image} alt="" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${product.sku}/200/200`; }} />
                       </div>
                       <div>
                         <div className="font-bold text-neutral-800 dark:text-neutral-200 group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">{product.name}</div>
                         <div className="text-xs text-neutral-500 font-mono flex items-center gap-2">
                            <span className="opacity-50">SKU:</span> 
                            <span className="text-neutral-600 dark:text-neutral-400">{product.sku}</span>
+                           {product.productCode && (
+                             <><span className="opacity-50 ml-1">·</span> <span className="text-sky-600 dark:text-sky-400">{product.productCode}</span></>
+                           )}
                         </div>
                       </div>
                     </div>
@@ -559,25 +592,51 @@ const Inventory: React.FC = () => {
             </div>
             
             <div className="p-6 space-y-5 bg-white dark:bg-neutral-950 max-h-[70vh] overflow-y-auto">
-              {/* Image Preview Area */}
+              {/* Image Upload Area */}
               <div className="flex justify-center mb-4">
-                 <div className="w-32 h-32 rounded-lg border-2 border-dashed border-neutral-300 dark:border-neutral-700 flex flex-col items-center justify-center overflow-hidden relative group cursor-pointer hover:border-sky-500 transition-colors bg-neutral-50 dark:bg-neutral-900">
-                    {newProduct.image ? (
-                        <img src={newProduct.image} className="w-full h-full object-cover" alt="Preview" />
-                    ) : (
-                        <ImageIcon className="w-8 h-8 text-neutral-400 group-hover:text-sky-500 transition-colors" />
-                    )}
-                    <div className="absolute bottom-2 right-2">
-                        <button 
-                            className="p-1.5 bg-neutral-900/80 text-white rounded-lg hover:bg-sky-600 transition-colors"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setNewProduct({...newProduct, image: `https://picsum.photos/200/200?random=${Math.floor(Math.random() * 1000)}`});
-                            }}
-                        >
-                            <RefreshCw className="w-3 h-3" />
-                        </button>
-                    </div>
+                 <div className="flex flex-col items-center gap-2">
+                   <div
+                     className="w-32 h-32 rounded-lg border-2 border-dashed border-neutral-300 dark:border-neutral-700 flex flex-col items-center justify-center overflow-hidden relative group cursor-pointer hover:border-sky-500 transition-colors bg-neutral-50 dark:bg-neutral-900"
+                     onClick={() => addImageInputRef.current?.click()}
+                   >
+                     {isUploadingAddImage ? (
+                       <Loader2 className="w-8 h-8 text-sky-500 animate-spin" />
+                     ) : newProduct.image ? (
+                       <img src={newProduct.image} className="w-full h-full object-cover" alt="Preview" onError={(e) => { (e.target as HTMLImageElement).src = 'https://picsum.photos/seed/product/200/200'; }} />
+                     ) : (
+                       <ImageIcon className="w-8 h-8 text-neutral-400 group-hover:text-sky-500 transition-colors" />
+                     )}
+                   </div>
+                   <div className="flex gap-2">
+                     <button
+                       type="button"
+                       disabled={isUploadingAddImage}
+                       onClick={() => addImageInputRef.current?.click()}
+                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white rounded-lg transition-colors font-bold"
+                     >
+                       {isUploadingAddImage ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                       Upload
+                     </button>
+                     <button
+                       type="button"
+                       disabled={isUploadingAddImage}
+                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-neutral-700 hover:bg-neutral-600 disabled:opacity-50 text-white rounded-lg transition-colors"
+                       onClick={() => setNewProduct({...newProduct, image: `https://picsum.photos/200/200?random=${Math.floor(Math.random() * 1000)}`})}
+                     >
+                       <RefreshCw className="w-3 h-3" /> Random
+                     </button>
+                   </div>
+                   <input
+                     ref={addImageInputRef}
+                     type="file"
+                     accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+                     className="hidden"
+                     onChange={(e) => {
+                       const file = e.target.files?.[0];
+                       if (file) handleImageUpload(file, (url) => setNewProduct({...newProduct, image: url}), setIsUploadingAddImage);
+                       e.target.value = '';
+                     }}
+                   />
                  </div>
               </div>
 
@@ -612,6 +671,28 @@ const Inventory: React.FC = () => {
                     value={newProduct.sku}
                     onChange={e => setNewProduct({...newProduct, sku: e.target.value})}
                     placeholder="e.g. QPU-001"
+                    className="w-full px-4 py-3 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all font-mono text-sm text-neutral-900 dark:text-white" 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">Product Code <span className="font-normal lowercase text-neutral-400">(auto if blank)</span></label>
+                  <input 
+                    type="text" 
+                    value={newProduct.productCode}
+                    onChange={e => setNewProduct({...newProduct, productCode: e.target.value})}
+                    placeholder="e.g. PRD-000001"
+                    className="w-full px-4 py-3 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all font-mono text-sm text-neutral-900 dark:text-white" 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">Barcode <span className="font-normal lowercase text-neutral-400">(optional)</span></label>
+                  <input 
+                    type="text" 
+                    value={newProduct.barcode}
+                    onChange={e => setNewProduct({...newProduct, barcode: e.target.value})}
+                    placeholder="e.g. 4006381333931"
                     className="w-full px-4 py-3 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all font-mono text-sm text-neutral-900 dark:text-white" 
                   />
                 </div>
@@ -714,6 +795,44 @@ const Inventory: React.FC = () => {
             </div>
             
             <div className="p-6 space-y-4 bg-white dark:bg-neutral-950 max-h-[70vh] overflow-y-auto">
+              {/* Image Upload Area */}
+              <div className="flex justify-center mb-2">
+                <div className="flex flex-col items-center gap-2">
+                  <div
+                    className="w-28 h-28 rounded-lg border-2 border-dashed border-neutral-300 dark:border-neutral-700 flex items-center justify-center overflow-hidden cursor-pointer hover:border-sky-500 transition-colors bg-neutral-50 dark:bg-neutral-900"
+                    onClick={() => editImageInputRef.current?.click()}
+                  >
+                    {isUploadingEditImage ? (
+                      <Loader2 className="w-8 h-8 text-sky-500 animate-spin" />
+                    ) : editingProduct?.image ? (
+                      <img src={editingProduct.image} className="w-full h-full object-cover" alt="Preview" onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${editingProduct.sku}/200/200`; }} />
+                    ) : (
+                      <ImageIcon className="w-8 h-8 text-neutral-400" />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isUploadingEditImage}
+                    onClick={() => editImageInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white rounded-lg transition-colors font-bold"
+                  >
+                    {isUploadingEditImage ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                    Upload Image
+                  </button>
+                  <input
+                    ref={editImageInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file && editingProduct)
+                        handleImageUpload(file, (url) => setEditingProduct({...editingProduct, image: url}), setIsUploadingEditImage);
+                      e.target.value = '';
+                    }}
+                  />
+                </div>
+              </div>
               {/* Similar fields to Add Modal but binding to editingProduct */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="col-span-1 sm:col-span-2">
@@ -744,6 +863,28 @@ const Inventory: React.FC = () => {
                     type="text" 
                     value={editingProduct.sku}
                     onChange={e => setEditingProduct({...editingProduct, sku: e.target.value})}
+                    className="w-full px-4 py-3 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all font-mono text-sm text-neutral-900 dark:text-white" 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">Product Code</label>
+                  <input 
+                    type="text" 
+                    value={editingProduct.productCode || ''}
+                    onChange={e => setEditingProduct({...editingProduct, productCode: e.target.value})}
+                    placeholder="e.g. PRD-000001"
+                    className="w-full px-4 py-3 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all font-mono text-sm text-neutral-900 dark:text-white" 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">Barcode <span className="font-normal lowercase text-neutral-400">(optional)</span></label>
+                  <input 
+                    type="text" 
+                    value={editingProduct.barcode || ''}
+                    onChange={e => setEditingProduct({...editingProduct, barcode: e.target.value})}
+                    placeholder="e.g. 4006381333931"
                     className="w-full px-4 py-3 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all font-mono text-sm text-neutral-900 dark:text-white" 
                   />
                 </div>

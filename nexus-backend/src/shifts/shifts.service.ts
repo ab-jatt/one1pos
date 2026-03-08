@@ -5,9 +5,14 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ShiftsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(employeeId?: string) {
+  async findAll(branchId: string, employeeId?: string) {
     const shifts = await this.prisma.shift.findMany({
-      where: employeeId ? { employeeId } : {},
+      where: {
+        ...(employeeId ? { employeeId } : {}),
+        employee: {
+          user: { branchId },
+        },
+      },
       include: {
         employee: {
           include: {

@@ -1,4 +1,4 @@
--- Neon Database Schema Backup
+docker builder prune -a-- Neon Database Schema Backup
 -- Created: 2026-03-02
 
 CREATE SCHEMA IF NOT EXISTS "public";

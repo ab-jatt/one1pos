@@ -1,32 +1,77 @@
-
-console.log("🚀 Running seed script...");
+console.log('🚀 Running seed script...');
 
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Return a date that is `daysAgo` days before now, at the given hour (UTC). */
+function daysBack(daysAgo: number, hour = 12): Date {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  d.setHours(hour, Math.floor(Math.random() * 60), 0, 0);
+  return d;
+}
+
+/** Pick a random integer in [min, max]. */
+function rnd(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+/** Pick `n` unique random indices from [0, len). */
+function pickIndices(n: number, len: number): number[] {
+  const pool = Array.from({ length: len }, (_, i) => i);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, n);
+}
+
+// ─── Order-number counter ─────────────────────────────────────────────────────
+let orderSeq = 1;
+function nextOrderNumber(): string {
+  return `ORD-${String(orderSeq++).padStart(6, '0')}`;
+}
+
 async function main() {
-  // Clear existing data
+  // ─── 0. Clear ALL tables in safe dependency order ──────────────────────────
   console.log('🧹 Clearing existing data...');
   await prisma.auditLog.deleteMany({});
+  await prisma.productionOrderItem.deleteMany({});
+  await prisma.productionOrder.deleteMany({});
+  await prisma.stockTransferItem.deleteMany({});
+  await prisma.stockTransfer.deleteMany({});
+  await prisma.warehouseMovement.deleteMany({});
+  await prisma.warehouseLocation.deleteMany({});
+  await prisma.warehouse.deleteMany({});
+  await prisma.payrollItem.deleteMany({});
+  await prisma.payrollRecord.deleteMany({});
   await prisma.purchaseOrderItem.deleteMany({});
   await prisma.purchaseOrder.deleteMany({});
   await prisma.transaction.deleteMany({});
   await prisma.payment.deleteMany({});
   await prisma.orderItem.deleteMany({});
+  await prisma.exchangeIssuedItem.deleteMany({});
+  await prisma.exchangeReturnItem.deleteMany({});
+  await prisma.exchange.deleteMany({});
   await prisma.order.deleteMany({});
   await prisma.stockMovement.deleteMany({});
-  await prisma.customerLedger.deleteMany({}); // Add this to fix foreign key constraint
   await prisma.stock.deleteMany({});
+  await prisma.customerLedger.deleteMany({});
+  await prisma.customer.deleteMany({});
   await prisma.product.deleteMany({});
   await prisma.category.deleteMany({});
-  await prisma.customer.deleteMany({});
   await prisma.supplier.deleteMany({});
   await prisma.shift.deleteMany({});
   await prisma.employee.deleteMany({});
   await prisma.user.deleteMany({});
   await prisma.branch.deleteMany({});
+  await prisma.setting.deleteMany({});
+  console.log('✅ Tables cleared');
 
-  // 1️⃣ Create a branch
+  // ─── 1. Branch ────────────────────────────────────────────────────────────
   const branch = await prisma.branch.create({
     data: {
       id: 'main-branch-id',
@@ -39,14 +84,17 @@ async function main() {
   });
   console.log('✅ Branch created');
 
-  // 2️⃣ Create users
+  // ─── 2. Users ─────────────────────────────────────────────────────────────
+  const adminHash   = await bcrypt.hash('admin123', 10);
+  const cashierHash = await bcrypt.hash('cashier123', 10);
+
   const adminUser = await prisma.user.create({
     data: {
       id: 'admin-user-id',
       email: 'admin@nexuspos.com',
-      password: 'hashed_password_123',
+      password: adminHash,
       name: 'System Admin',
-      role: 'ADMIN',
+      role: 'OWNER',
       permissions: ['all'],
       branchId: branch.id,
     },
@@ -56,687 +104,311 @@ async function main() {
     data: {
       id: 'cashier-user-id',
       email: 'cashier@nexuspos.com',
-      password: 'hashed_password_456',
+      password: cashierHash,
       name: 'John Cashier',
       role: 'CASHIER',
       permissions: ['pos', 'inventory.view'],
       branchId: branch.id,
     },
   });
-  console.log('✅ Users created');
 
-  // 3️⃣ Create categories
-  const beverages = await prisma.category.create({
-    data: { name: 'Beverages' },
+  const cashierUser2 = await prisma.user.create({
+    data: {
+      email: 'cashier2@nexuspos.com',
+      password: cashierHash,
+      name: 'Maria Lopez',
+      role: 'CASHIER',
+      permissions: ['pos'],
+      branchId: branch.id,
+    },
   });
+  console.log('✅ Users created (admin@nexuspos.com / admin123, cashier@nexuspos.com / cashier123)');
 
-  const snacks = await prisma.category.create({
-    data: { name: 'Snacks' },
-  });
-
-  const bakery = await prisma.category.create({
-    data: { name: 'Bakery' },
-  });
-
-  const electronics = await prisma.category.create({
-    data: { name: 'Electronics' },
-  });
-
-  const dairy = await prisma.category.create({
-    data: { name: 'Dairy' },
-  });
+  // ─── 3. Categories ────────────────────────────────────────────────────────
+  const beverages  = await prisma.category.create({ data: { name: 'Beverages',   branchId: branch.id } });
+  const snacks     = await prisma.category.create({ data: { name: 'Snacks',      branchId: branch.id } });
+  const bakery     = await prisma.category.create({ data: { name: 'Bakery',      branchId: branch.id } });
+  const electronics = await prisma.category.create({ data: { name: 'Electronics', branchId: branch.id } });
+  const dairy      = await prisma.category.create({ data: { name: 'Dairy',       branchId: branch.id } });
   console.log('✅ Categories created');
 
-  // 4️⃣ Create products
-  const products = await Promise.all([
-    prisma.product.create({
-      data: {
-        name: 'Espresso',
-        sku: 'SKU-ESP-001',
-        description: 'Rich Italian espresso',
-        price: 3.50,
-        costPrice: 1.20,
-        categoryId: beverages.id,
-        image: 'https://images.unsplash.com/photo-1510591509098-f4fdc6d0ff04?w=200',
-      },
-    }),
-    prisma.product.create({
-      data: {
-        name: 'Cappuccino',
-        sku: 'SKU-CAP-002',
-        description: 'Classic cappuccino with foam',
-        price: 4.50,
-        costPrice: 1.50,
-        categoryId: beverages.id,
-        image: 'https://images.unsplash.com/photo-1572442388796-11668a67e53d?w=200',
-      },
-    }),
-    prisma.product.create({
-      data: {
-        name: 'Latte',
-        sku: 'SKU-LAT-003',
-        description: 'Smooth caffe latte',
-        price: 4.75,
-        costPrice: 1.60,
-        categoryId: beverages.id,
-        image: 'https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=200',
-      },
-    }),
-    prisma.product.create({
-      data: {
-        name: 'Croissant',
-        sku: 'SKU-CRO-004',
-        description: 'Buttery French croissant',
-        price: 3.00,
-        costPrice: 1.00,
-        categoryId: bakery.id,
-        image: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=200',
-      },
-    }),
-    prisma.product.create({
-      data: {
-        name: 'Chocolate Chip Cookie',
-        sku: 'SKU-COO-005',
-        description: 'Freshly baked cookie',
-        price: 2.50,
-        costPrice: 0.80,
-        categoryId: snacks.id,
-        image: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=200',
-      },
-    }),
-    prisma.product.create({
-      data: {
-        name: 'Orange Juice',
-        sku: 'SKU-OJ-006',
-        description: 'Fresh squeezed orange juice',
-        price: 4.00,
-        costPrice: 1.20,
-        categoryId: beverages.id,
-        image: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=200',
-      },
-    }),
-    prisma.product.create({
-      data: {
-        name: 'Blueberry Muffin',
-        sku: 'SKU-MUF-007',
-        description: 'Fresh blueberry muffin',
-        price: 3.25,
-        costPrice: 1.10,
-        categoryId: bakery.id,
-        image: 'https://images.unsplash.com/photo-1607958996333-41aef7caefaa?w=200',
-      },
-    }),
-    prisma.product.create({
-      data: {
-        name: 'Cheese Danish',
-        sku: 'SKU-DAN-008',
-        description: 'Cream cheese danish pastry',
-        price: 3.50,
-        costPrice: 1.15,
-        categoryId: bakery.id,
-        image: 'https://images.unsplash.com/photo-1509365465985-25d11c17e812?w=200',
-      },
-    }),
-    prisma.product.create({
-      data: {
-        name: 'Potato Chips',
-        sku: 'SKU-CHP-009',
-        description: 'Classic salted chips',
-        price: 2.00,
-        costPrice: 0.60,
-        categoryId: snacks.id,
-        image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=200',
-      },
-    }),
-    prisma.product.create({
-      data: {
-        name: 'Whole Milk',
-        sku: 'SKU-MLK-010',
-        description: 'Fresh whole milk 1L',
-        price: 3.50,
-        costPrice: 2.00,
-        categoryId: dairy.id,
-        image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=200',
-      },
-    }),
-    prisma.product.create({
-      data: {
-        name: 'USB-C Cable',
-        sku: 'SKU-USB-011',
-        description: 'Fast charging USB-C cable',
-        price: 12.99,
-        costPrice: 4.50,
-        categoryId: electronics.id,
-        image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=200',
-      },
-    }),
-    prisma.product.create({
-      data: {
-        name: 'Wireless Earbuds',
-        sku: 'SKU-EAR-012',
-        description: 'Bluetooth wireless earbuds',
-        price: 29.99,
-        costPrice: 12.00,
-        categoryId: electronics.id,
-        image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=200',
-      },
-    }),
-  ]);
+  // ─── 4. Products ─────────────────────────────────────────────────────────
+  //  [name, sku, price, costPrice, categoryId]
+  const productDefs = [
+    // Beverages (0-4)
+    { name: 'Espresso',        sku: 'SKU-ESP-001', productCode: 'PRD-000001', barcode: '4006381333931', price: 3.50,  costPrice: 1.20, categoryId: beverages.id,   image: 'https://picsum.photos/seed/espresso/200/200' },
+    { name: 'Cappuccino',      sku: 'SKU-CAP-002', productCode: 'PRD-000002', barcode: '4006381333932', price: 4.50,  costPrice: 1.50, categoryId: beverages.id,   image: 'https://picsum.photos/seed/cappuccino/200/200' },
+    { name: 'Latte',           sku: 'SKU-LAT-003', productCode: 'PRD-000003', barcode: '4006381333933', price: 4.75,  costPrice: 1.60, categoryId: beverages.id,   image: 'https://picsum.photos/seed/latte/200/200' },
+    { name: 'Orange Juice',    sku: 'SKU-OJ-006',  productCode: 'PRD-000004', barcode: '4006381333934', price: 4.00,  costPrice: 1.20, categoryId: beverages.id,   image: 'https://picsum.photos/seed/orangejuice/200/200' },
+    { name: 'Iced Tea',        sku: 'SKU-ICT-013', productCode: 'PRD-000005', barcode: '4006381333935', price: 3.25,  costPrice: 0.90, categoryId: beverages.id,   image: 'https://picsum.photos/seed/icedtea/200/200' },
+    // Bakery (5-7)
+    { name: 'Croissant',       sku: 'SKU-CRO-004', productCode: 'PRD-000006', barcode: '4006381333936', price: 3.00,  costPrice: 1.00, categoryId: bakery.id,      image: 'https://picsum.photos/seed/croissant/200/200' },
+    { name: 'Blueberry Muffin',sku: 'SKU-MUF-007', productCode: 'PRD-000007', barcode: '4006381333937', price: 3.25,  costPrice: 1.10, categoryId: bakery.id,      image: 'https://picsum.photos/seed/muffin/200/200' },
+    { name: 'Cheese Danish',   sku: 'SKU-DAN-008', productCode: 'PRD-000008', barcode: '4006381333938', price: 3.50,  costPrice: 1.15, categoryId: bakery.id,      image: 'https://picsum.photos/seed/danish/200/200' },
+    // Snacks (8-9)
+    { name: 'Chocolate Chip Cookie', sku: 'SKU-COO-005', productCode: 'PRD-000009', barcode: '4006381333939', price: 2.50, costPrice: 0.80, categoryId: snacks.id, image: 'https://picsum.photos/seed/cookie/200/200' },
+    { name: 'Potato Chips',    sku: 'SKU-CHP-009', productCode: 'PRD-000010', barcode: '4006381333940', price: 2.00,  costPrice: 0.60, categoryId: snacks.id,      image: 'https://picsum.photos/seed/chips/200/200' },
+    // Dairy (10)
+    { name: 'Whole Milk 1L',   sku: 'SKU-MLK-010', productCode: 'PRD-000011', barcode: '4006381333941', price: 3.50,  costPrice: 2.00, categoryId: dairy.id,       image: 'https://picsum.photos/seed/milk/200/200' },
+    // Electronics (11-12)
+    { name: 'USB-C Cable',     sku: 'SKU-USB-011', productCode: 'PRD-000012', barcode: '4006381333942', price: 12.99, costPrice: 4.50, categoryId: electronics.id, image: 'https://picsum.photos/seed/usbcable/200/200' },
+    { name: 'Wireless Earbuds',sku: 'SKU-EAR-012', productCode: 'PRD-000013', barcode: '4006381333943', price: 29.99, costPrice: 12.00, categoryId: electronics.id, image: 'https://picsum.photos/seed/earbuds/200/200' },
+  ];
+
+  const products = await Promise.all(
+    productDefs.map((d) =>
+      prisma.product.create({
+        data: {
+          name:        d.name,
+          sku:         d.sku,
+          productCode: d.productCode,
+          barcode:     d.barcode,
+          price:       d.price,
+          costPrice:   d.costPrice,
+          categoryId:  d.categoryId,
+          image:       d.image,
+        },
+      })
+    )
+  );
   console.log('✅ Products created');
 
-  // 4️⃣ Create stock for each product
+  // ─── 5. Stock ─────────────────────────────────────────────────────────────
+  // Stagger quantities so stock-distribution chart is varied
+  const stockQtys = [120, 95, 85, 70, 110, 60, 55, 40, 90, 130, 45, 30, 20];
   await Promise.all(
-    products.map((product, index) =>
+    products.map((p, i) =>
       prisma.stock.create({
         data: {
-          branchId: branch.id,
-          productId: product.id,
-          quantity: 50 + index * 10,
-          minStock: 10,
+          branchId:  branch.id,
+          productId: p.id,
+          quantity:  stockQtys[i] ?? 50,
+          minStock:  10,
         },
       })
     )
   );
   console.log('✅ Stock created');
 
-  // 6️⃣ Create customers
+  // ─── 6. Customers ─────────────────────────────────────────────────────────
   const customers = await Promise.all([
-    prisma.customer.create({
-      data: {
-        name: 'John Doe',
-        email: 'john.doe@example.com',
-        phone: '+1-555-0101',
-        points: 150,
-        balance: 0,
-      },
-    }),
-    prisma.customer.create({
-      data: {
-        name: 'Jane Smith',
-        email: 'jane.smith@example.com',
-        phone: '+1-555-0102',
-        points: 200,
-        balance: 25.50,
-      },
-    }),
-    prisma.customer.create({
-      data: {
-        name: 'Bob Wilson',
-        email: 'bob.wilson@example.com',
-        phone: '+1-555-0103',
-        points: 75,
-        balance: 0,
-      },
-    }),
-    prisma.customer.create({
-      data: {
-        name: 'Alice Johnson',
-        email: 'alice.johnson@example.com',
-        phone: '+1-555-0104',
-        points: 320,
-        balance: 50.00,
-      },
-    }),
-    prisma.customer.create({
-      data: {
-        name: 'Charlie Brown',
-        email: 'charlie.brown@example.com',
-        phone: '+1-555-0105',
-        points: 45,
-        balance: 0,
-      },
-    }),
+    prisma.customer.create({ data: { name: 'John Doe',      email: 'john@example.com',    phone: '+1-555-0101', points: 150,  balance: 0 } }),
+    prisma.customer.create({ data: { name: 'Jane Smith',    email: 'jane@example.com',    phone: '+1-555-0102', points: 200,  balance: 25.50 } }),
+    prisma.customer.create({ data: { name: 'Bob Wilson',    email: 'bob@example.com',     phone: '+1-555-0103', points: 75,   balance: 0 } }),
+    prisma.customer.create({ data: { name: 'Alice Johnson', email: 'alice@example.com',   phone: '+1-555-0104', points: 320,  balance: 50.00 } }),
+    prisma.customer.create({ data: { name: 'Charlie Brown', email: 'charlie@example.com', phone: '+1-555-0105', points: 45,   balance: 0 } }),
   ]);
   console.log('✅ Customers created');
 
-  // 7️⃣ Create suppliers
+  // ─── 7. Suppliers ─────────────────────────────────────────────────────────
   const suppliers = await Promise.all([
-    prisma.supplier.create({
-      data: {
-        name: 'Coffee Beans Co.',
-        contactPerson: 'Mike Johnson',
-        email: 'sales@coffeebeans.com',
-        phone: '+1-555-0200',
-        address: '456 Supply Ave, Warehouse District',
-        paymentTerms: 'Net 30',
-      },
-    }),
-    prisma.supplier.create({
-      data: {
-        name: 'Bakery Supplies Inc.',
-        contactPerson: 'Sarah Lee',
-        email: 'orders@bakerysupplies.com',
-        phone: '+1-555-0201',
-        address: '789 Flour Street, Industrial Park',
-        paymentTerms: 'Net 15',
-      },
-    }),
-    prisma.supplier.create({
-      data: {
-        name: 'Tech Gadgets Wholesale',
-        contactPerson: 'David Chen',
-        email: 'wholesale@techgadgets.com',
-        phone: '+1-555-0202',
-        address: '321 Silicon Way, Tech Hub',
-        paymentTerms: 'Net 45',
-      },
-    }),
-    prisma.supplier.create({
-      data: {
-        name: 'Fresh Dairy Farms',
-        contactPerson: 'Emma Wilson',
-        email: 'orders@freshdairy.com',
-        phone: '+1-555-0203',
-        address: '555 Farm Road, Countryside',
-        paymentTerms: 'Due on Receipt',
-      },
-    }),
+    prisma.supplier.create({ data: { name: 'Coffee Beans Co.',       contactPerson: 'Mike Johnson',  email: 'sales@coffeebeans.com',    phone: '+1-555-0200', paymentTerms: 'Net 30' } }),
+    prisma.supplier.create({ data: { name: 'Bakery Supplies Inc.',   contactPerson: 'Sarah Lee',     email: 'orders@bakerysupplies.com',phone: '+1-555-0201', paymentTerms: 'Net 15' } }),
+    prisma.supplier.create({ data: { name: 'Tech Gadgets Wholesale', contactPerson: 'David Chen',    email: 'wholesale@techgadgets.com',phone: '+1-555-0202', paymentTerms: 'Net 45' } }),
+    prisma.supplier.create({ data: { name: 'Fresh Dairy Farms',      contactPerson: 'Emma Wilson',   email: 'orders@freshdairy.com',    phone: '+1-555-0203', paymentTerms: 'Due on Receipt' } }),
   ]);
   console.log('✅ Suppliers created');
 
-  // 8️⃣ Create employees (linked to Users)
-  const employeeUser1 = await prisma.user.create({
-    data: {
-      email: 'emily.davis@nexuspos.com',
-      password: 'hashed_password_emp1',
-      name: 'Emily Davis',
-      role: 'MANAGER',
-      permissions: ['all'],
-      branchId: branch.id,
-    },
-  });
-
-  const employeeUser2 = await prisma.user.create({
-    data: {
-      email: 'michael.chen@nexuspos.com',
-      password: 'hashed_password_emp2',
-      name: 'Michael Chen',
-      role: 'CASHIER',
-      permissions: ['pos', 'inventory.view'],
-      branchId: branch.id,
-    },
-  });
-
-  const employeeUser3 = await prisma.user.create({
-    data: {
-      email: 'sarah.thompson@nexuspos.com',
-      password: 'hashed_password_emp3',
-      name: 'Sarah Thompson',
-      role: 'CASHIER',
-      permissions: ['pos'],
-      branchId: branch.id,
-    },
-  });
-
-  const employeeUser4 = await prisma.user.create({
-    data: {
-      email: 'james.rodriguez@nexuspos.com',
-      password: 'hashed_password_emp4',
-      name: 'James Rodriguez',
-      role: 'MANAGER',
-      permissions: ['inventory', 'products', 'reports'],
-      branchId: branch.id,
-    },
-  });
-
-  const employeeUser5 = await prisma.user.create({
-    data: {
-      email: 'lisa.park@nexuspos.com',
-      password: 'hashed_password_emp5',
-      name: 'Lisa Park',
-      role: 'CASHIER',
-      permissions: ['pos'],
-      branchId: branch.id,
-    },
-  });
+  // ─── 8. Employees ─────────────────────────────────────────────────────────
+  const empUsers = await Promise.all([
+    prisma.user.create({ data: { email: 'emily@nexuspos.com',   password: 'x', name: 'Emily Davis',     role: 'MANAGER', permissions: ['all'], branchId: branch.id } }),
+    prisma.user.create({ data: { email: 'michael@nexuspos.com', password: 'x', name: 'Michael Chen',    role: 'CASHIER', permissions: ['pos', 'inventory.view'], branchId: branch.id } }),
+    prisma.user.create({ data: { email: 'sarah@nexuspos.com',   password: 'x', name: 'Sarah Thompson',  role: 'CASHIER', permissions: ['pos'], branchId: branch.id } }),
+    prisma.user.create({ data: { email: 'james@nexuspos.com',   password: 'x', name: 'James Rodriguez', role: 'MANAGER', permissions: ['inventory', 'reports'], branchId: branch.id } }),
+    prisma.user.create({ data: { email: 'lisa@nexuspos.com',    password: 'x', name: 'Lisa Park',       role: 'CASHIER', permissions: ['pos'], branchId: branch.id } }),
+  ]);
 
   const employees = await Promise.all([
-    prisma.employee.create({
-      data: {
-        userId: employeeUser1.id,
-        position: 'Store Manager',
-        department: 'Management',
-        salary: 5500,
-        status: 'ACTIVE',
-        joinDate: new Date('2024-01-15'),
-      },
-    }),
-    prisma.employee.create({
-      data: {
-        userId: employeeUser2.id,
-        position: 'Senior Cashier',
-        department: 'Sales',
-        salary: 3200,
-        status: 'ACTIVE',
-        joinDate: new Date('2024-03-20'),
-      },
-    }),
-    prisma.employee.create({
-      data: {
-        userId: employeeUser3.id,
-        position: 'Cashier',
-        department: 'Sales',
-        salary: 2800,
-        status: 'ACTIVE',
-        joinDate: new Date('2024-06-01'),
-      },
-    }),
-    prisma.employee.create({
-      data: {
-        userId: employeeUser4.id,
-        position: 'Inventory Manager',
-        department: 'Operations',
-        salary: 4200,
-        status: 'ACTIVE',
-        joinDate: new Date('2024-02-10'),
-      },
-    }),
-    prisma.employee.create({
-      data: {
-        userId: employeeUser5.id,
-        position: 'Cashier',
-        department: 'Sales',
-        salary: 2800,
-        status: 'ON_LEAVE',
-        joinDate: new Date('2024-08-15'),
-      },
-    }),
+    prisma.employee.create({ data: { userId: empUsers[0].id, department: 'Management', position: 'Store Manager',     salary: 5500, status: 'ACTIVE',    joinDate: new Date('2024-01-15') } }),
+    prisma.employee.create({ data: { userId: empUsers[1].id, department: 'Sales',      position: 'Senior Cashier',    salary: 3200, status: 'ACTIVE',    joinDate: new Date('2024-03-20') } }),
+    prisma.employee.create({ data: { userId: empUsers[2].id, department: 'Sales',      position: 'Cashier',           salary: 2800, status: 'ACTIVE',    joinDate: new Date('2024-06-01') } }),
+    prisma.employee.create({ data: { userId: empUsers[3].id, department: 'Operations', position: 'Inventory Manager', salary: 4200, status: 'ACTIVE',    joinDate: new Date('2024-02-10') } }),
+    prisma.employee.create({ data: { userId: empUsers[4].id, department: 'Sales',      position: 'Cashier',           salary: 2800, status: 'ON_LEAVE',  joinDate: new Date('2024-08-15') } }),
   ]);
   console.log('✅ Employees created');
 
-  // 8️⃣.5️⃣ Create shifts for employees
-  const shifts = await Promise.all([
-    prisma.shift.create({
-      data: {
-        employeeId: employees[0].id,
-        startTime: new Date('2026-01-06T08:00:00'),
-        endTime: new Date('2026-01-06T16:00:00'),
-        type: 'Morning',
-      },
-    }),
-    prisma.shift.create({
-      data: {
-        employeeId: employees[0].id,
-        startTime: new Date('2026-01-07T08:00:00'),
-        endTime: new Date('2026-01-07T16:00:00'),
-        type: 'Morning',
-      },
-    }),
-    prisma.shift.create({
-      data: {
-        employeeId: employees[1].id,
-        startTime: new Date('2026-01-06T14:00:00'),
-        endTime: new Date('2026-01-06T22:00:00'),
-        type: 'Evening',
-      },
-    }),
-    prisma.shift.create({
-      data: {
-        employeeId: employees[2].id,
-        startTime: new Date('2026-01-06T10:00:00'),
-        endTime: new Date('2026-01-06T18:00:00'),
-        type: 'Afternoon',
-      },
-    }),
-  ]);
-  console.log('✅ Shifts created');
+  // ─── 9. Orders – 60 orders spread across last 30 days ────────────────────
+  //  Cashiers and customers to rotate through
+  const cashierIds  = [cashierUser.id, cashierUser2.id];
+  const customerIds = [null, ...customers.map((c) => c.id)]; // null = walk-in
 
-  // 9️⃣ Create some sample orders
-  const order1 = await prisma.order.create({
-    data: {
-      orderNumber: 'ORD-000001',
-      customerId: customers[0].id,
-      cashierId: cashierUser.id,
-      branchId: branch.id,
-      status: 'COMPLETED',
-      subtotal: 12.00,
-      tax: 0.96,
-      discount: 0,
-      total: 12.96,
-      items: {
-        create: [
-          { productId: products[0].id, quantity: 2, price: 3.50, cost: 1.20 },
-          { productId: products[3].id, quantity: 1, price: 3.00, cost: 1.00 },
-          { productId: products[4].id, quantity: 1, price: 2.50, cost: 0.80 },
-        ],
-      },
-      payments: {
-        create: { method: 'CASH', amount: 12.96 },
-      },
-    },
-  });
+  // Template order "recipes": arrays of [productIndex, quantity]
+  const recipes: [number, number][][] = [
+    [[0, 2], [5, 1]],                          // 2× Espresso + Croissant
+    [[1, 1], [6, 1], [8, 1]],                  // Cappuccino + Muffin + Cookie
+    [[2, 1], [7, 1]],                          // Latte + Cheese Danish
+    [[3, 2], [9, 2]],                          // 2× OJ + 2× Chips
+    [[11, 1]],                                 // USB-C Cable only
+    [[12, 1], [1, 1]],                         // Earbuds + Cappuccino
+    [[0, 1], [4, 1], [8, 2]],                  // Espresso + Iced Tea + 2× Cookie
+    [[5, 2], [6, 1], [3, 1]],                  // 2× Croissant + Muffin + OJ
+    [[10, 2]],                                 // 2× Whole Milk
+    [[1, 2], [2, 1], [7, 1]],                  // 2× Cappuccino + Latte + Danish
+    [[0, 3], [9, 1]],                          // 3× Espresso + Chips
+    [[3, 1], [4, 2], [5, 1], [8, 1]],          // OJ + 2× Iced Tea + Croissant + Cookie
+    [[11, 2], [9, 3]],                         // 2× USB-C + 3× Chips
+    [[2, 2], [6, 2]],                          // 2× Latte + 2× Muffin
+    [[0, 1], [1, 1], [2, 1]],                  // 1 of each coffee
+  ];
 
-  const order2 = await prisma.order.create({
-    data: {
-      orderNumber: 'ORD-000002',
-      customerId: customers[1].id,
-      cashierId: cashierUser.id,
-      branchId: branch.id,
-      status: 'COMPLETED',
-      subtotal: 42.98,
-      tax: 3.44,
-      discount: 5.00,
-      total: 41.42,
-      items: {
-        create: [
-          { productId: products[10].id, quantity: 1, price: 12.99, cost: 4.50 },
-          { productId: products[11].id, quantity: 1, price: 29.99, cost: 12.00 },
-        ],
-      },
-      payments: {
-        create: { method: 'CARD', amount: 41.42 },
-      },
-    },
-  });
+  // Distribute 60 orders: 1-3 per day over 30 days (older days slightly fewer)
+  const orderDates: { daysAgo: number; hour: number }[] = [];
+  for (let day = 0; day <= 29; day++) {
+    const count = day < 5 ? rnd(1, 3) : rnd(2, 4); // recent days busier
+    for (let k = 0; k < count; k++) {
+      orderDates.push({ daysAgo: day, hour: rnd(8, 20) });
+    }
+  }
 
-  const order3 = await prisma.order.create({
-    data: {
-      orderNumber: 'ORD-000003',
-      cashierId: cashierUser.id,
-      branchId: branch.id,
-      status: 'COMPLETED',
-      subtotal: 8.25,
-      tax: 0.66,
-      discount: 0,
-      total: 8.91,
-      items: {
-        create: [
-          { productId: products[1].id, quantity: 1, price: 4.50, cost: 1.50 },
-          { productId: products[6].id, quantity: 1, price: 3.25, cost: 1.10 },
-          { productId: products[4].id, quantity: 1, price: 2.50, cost: 0.80 },
-        ],
-      },
-      payments: {
-        create: { method: 'WALLET', amount: 8.91 },
-      },
-    },
-  });
-  console.log('✅ Orders created');
+  const PAYMENT_METHODS: ('CASH' | 'CARD' | 'WALLET')[] = ['CASH', 'CARD', 'WALLET'];
 
-  // 🔟 Create transactions for accounting
-  await Promise.all([
-    prisma.transaction.create({
+  for (const { daysAgo, hour } of orderDates) {
+    const recipe  = recipes[rnd(0, recipes.length - 1)];
+    const cashier = cashierIds[rnd(0, cashierIds.length - 1)];
+    const custId  = customerIds[rnd(0, customerIds.length - 1)];
+    const pm      = PAYMENT_METHODS[rnd(0, 2)];
+    const taxRate = 0.08;
+    const discount = rnd(0, 10) > 8 ? rnd(1, 5) : 0; // ~10% chance of a discount
+
+    let subtotal = 0;
+    const items = recipe.map(([pi, qty]) => {
+      const prod = products[pi];
+      const lineTotal = Number(prod.price) * qty;
+      subtotal += lineTotal;
+      return { productId: prod.id, quantity: qty, price: Number(prod.price), cost: Number(prod.costPrice) };
+    });
+
+    const tax   = Math.round(subtotal * taxRate * 100) / 100;
+    const total = Math.round((subtotal + tax - discount) * 100) / 100;
+    const ts    = daysBack(daysAgo, hour);
+
+    await prisma.order.create({
       data: {
-        description: 'Daily Sales Revenue',
-        amount: 1250.00,
-        type: 'INCOME',
-        category: 'Sales',
-        date: new Date('2026-01-05'),
-        branchId: branch.id,
+        orderNumber: nextOrderNumber(),
+        cashierId:   cashier,
+        branchId:    branch.id,
+        customerId:  custId,
+        status:      'COMPLETED',
+        subtotal,
+        tax,
+        discount,
+        total,
+        createdAt:   ts,
+        updatedAt:   ts,
+        items:    { create: items },
+        payments: { create: { method: pm, amount: total, processedAt: ts } },
       },
-    }),
-    prisma.transaction.create({
-      data: {
-        description: 'Rent Payment - January',
-        amount: 2500.00,
-        type: 'EXPENSE',
-        category: 'Rent',
-        date: new Date('2026-01-01'),
-        branchId: branch.id,
-      },
-    }),
-    prisma.transaction.create({
-      data: {
-        description: 'Utility Bills',
-        amount: 350.00,
-        type: 'EXPENSE',
-        category: 'Utilities',
-        date: new Date('2026-01-03'),
-        branchId: branch.id,
-      },
-    }),
-    prisma.transaction.create({
-      data: {
-        description: 'Inventory Purchase - Coffee Beans',
-        amount: 800.00,
-        type: 'EXPENSE',
-        category: 'Inventory',
-        date: new Date('2026-01-04'),
-        branchId: branch.id,
-      },
-    }),
-    prisma.transaction.create({
-      data: {
-        description: 'Weekend Sales Revenue',
-        amount: 2100.00,
-        type: 'INCOME',
-        category: 'Sales',
-        date: new Date('2026-01-04'),
-        branchId: branch.id,
-      },
-    }),
-    prisma.transaction.create({
-      data: {
-        description: 'Employee Payroll',
-        amount: 4500.00,
-        type: 'EXPENSE',
-        category: 'Payroll',
-        date: new Date('2026-01-01'),
-        branchId: branch.id,
-      },
-    }),
-    prisma.transaction.create({
-      data: {
-        description: 'Online Order Revenue',
-        amount: 450.00,
-        type: 'INCOME',
-        category: 'Sales',
-        date: new Date('2026-01-06'),
-        branchId: branch.id,
-      },
-    }),
-  ]);
+    });
+  }
+  console.log(`✅ ${orderDates.length} orders created (spread over last 30 days)`);
+
+  // ─── 10. Transactions (INCOME + EXPENSE) over last 30 days ───────────────
+  const txns: {
+    description: string;
+    amount: number;
+    type: 'INCOME' | 'EXPENSE';
+    category: string;
+    daysAgo: number;
+  }[] = [
+    // Regular monthly expenses
+    { description: 'Rent Payment',               amount: 2500, type: 'EXPENSE', category: 'Rent',      daysAgo: 28 },
+    { description: 'Employee Payroll',           amount: 4500, type: 'EXPENSE', category: 'Payroll',   daysAgo: 27 },
+    { description: 'Utility Bills – Electricity',amount: 350,  type: 'EXPENSE', category: 'Utilities', daysAgo: 26 },
+    { description: 'Internet & Phone',           amount: 120,  type: 'EXPENSE', category: 'Utilities', daysAgo: 25 },
+    { description: 'Coffee Beans Restock',       amount: 800,  type: 'EXPENSE', category: 'Inventory', daysAgo: 24 },
+    { description: 'Bakery Supplies Restock',    amount: 450,  type: 'EXPENSE', category: 'Inventory', daysAgo: 22 },
+    { description: 'Cleaning Supplies',          amount: 85,   type: 'EXPENSE', category: 'Operations',daysAgo: 20 },
+    { description: 'POS Software Subscription', amount: 99,   type: 'EXPENSE', category: 'Software',  daysAgo: 18 },
+    { description: 'Tech Gadgets Restock',       amount: 600,  type: 'EXPENSE', category: 'Inventory', daysAgo: 16 },
+    { description: 'Marketing – Social Ads',     amount: 200,  type: 'EXPENSE', category: 'Marketing', daysAgo: 14 },
+    { description: 'Dairy Restock',              amount: 180,  type: 'EXPENSE', category: 'Inventory', daysAgo: 12 },
+    { description: 'Part-time Staff Pay',        amount: 900,  type: 'EXPENSE', category: 'Payroll',   daysAgo: 10 },
+    { description: 'Equipment Maintenance',      amount: 250,  type: 'EXPENSE', category: 'Operations',daysAgo: 8 },
+    { description: 'Water & Waste Services',     amount: 75,   type: 'EXPENSE', category: 'Utilities', daysAgo: 6 },
+    { description: 'Coffee Beans Mid-month',     amount: 400,  type: 'EXPENSE', category: 'Inventory', daysAgo: 4 },
+    { description: 'Insurance Premium',          amount: 320,  type: 'EXPENSE', category: 'Insurance', daysAgo: 2 },
+    // Income entries (supplement to POS orders)
+    { description: 'Catering Event Revenue',     amount: 850,  type: 'INCOME',  category: 'Catering',  daysAgo: 21 },
+    { description: 'Corporate Order – TechCo',  amount: 520,  type: 'INCOME',  category: 'B2B Sales', daysAgo: 15 },
+    { description: 'Gift Card Sales',            amount: 300,  type: 'INCOME',  category: 'Gift Cards',daysAgo: 9 },
+    { description: 'Weekend Event Revenue',      amount: 1200, type: 'INCOME',  category: 'Events',    daysAgo: 3 },
+  ];
+
+  await Promise.all(
+    txns.map((t) => {
+      const d = daysBack(t.daysAgo);
+      return prisma.transaction.create({
+        data: {
+          description: t.description,
+          amount:      t.amount,
+          type:        t.type,
+          category:    t.category,
+          date:        d,
+          branchId:    branch.id,
+        },
+      });
+    })
+  );
   console.log('✅ Transactions created');
 
-  // 1️⃣1️⃣ Create purchase orders
-  await prisma.purchaseOrder.create({
-    data: {
-      supplierId: suppliers[0].id,
-      branchId: branch.id,
-      status: 'RECEIVED',
-      total: 450.00,
-      items: {
-        create: [
+  // ─── 11. Purchase Orders ──────────────────────────────────────────────────
+  await Promise.all([
+    prisma.purchaseOrder.create({
+      data: {
+        supplierId: suppliers[0].id, branchId: branch.id, status: 'RECEIVED', total: 430,
+        items: { create: [
           { productId: products[0].id, quantity: 100, cost: 1.20 },
           { productId: products[1].id, quantity: 100, cost: 1.50 },
           { productId: products[2].id, quantity: 100, cost: 1.60 },
-        ],
+        ]},
       },
-    },
-  });
-
-  await prisma.purchaseOrder.create({
-    data: {
-      supplierId: suppliers[1].id,
-      branchId: branch.id,
-      status: 'PENDING',
-      total: 325.00,
-      items: {
-        create: [
-          { productId: products[3].id, quantity: 150, cost: 1.00 },
+    }),
+    prisma.purchaseOrder.create({
+      data: {
+        supplierId: suppliers[1].id, branchId: branch.id, status: 'PENDING', total: 320,
+        items: { create: [
+          { productId: products[5].id, quantity: 150, cost: 1.00 },
           { productId: products[6].id, quantity: 100, cost: 1.10 },
-          { productId: products[7].id, quantity: 50, cost: 1.15 },
-        ],
-      },
-    },
-  });
-
-  await prisma.purchaseOrder.create({
-    data: {
-      supplierId: suppliers[2].id,
-      branchId: branch.id,
-      status: 'PENDING',
-      total: 825.00,
-      items: {
-        create: [
-          { productId: products[10].id, quantity: 50, cost: 4.50 },
-          { productId: products[11].id, quantity: 50, cost: 12.00 },
-        ],
-      },
-    },
-  });
-  console.log('✅ Purchase Orders created');
-
-  // 1️⃣2️⃣ Create audit logs
-  await Promise.all([
-    prisma.auditLog.create({
-      data: {
-        userId: adminUser.id,
-        action: 'User Login',
-        module: 'Authentication',
-        details: 'Admin user logged in successfully',
-        ipAddress: '192.168.1.100',
+          { productId: products[7].id, quantity:  50, cost: 1.15 },
+        ]},
       },
     }),
-    prisma.auditLog.create({
+    prisma.purchaseOrder.create({
       data: {
-        userId: cashierUser.id,
-        action: 'Order Created',
-        module: 'POS',
-        details: 'Created order ORD-000001 for $12.96',
-        ipAddress: '192.168.1.101',
-      },
-    }),
-    prisma.auditLog.create({
-      data: {
-        userId: adminUser.id,
-        action: 'Product Added',
-        module: 'Inventory',
-        details: 'Added new product: Wireless Earbuds',
-        ipAddress: '192.168.1.100',
-      },
-    }),
-    prisma.auditLog.create({
-      data: {
-        userId: adminUser.id,
-        action: 'Employee Created',
-        module: 'HR',
-        details: 'Added new employee: Sarah Thompson',
-        ipAddress: '192.168.1.100',
-      },
-    }),
-    prisma.auditLog.create({
-      data: {
-        userId: cashierUser.id,
-        action: 'Customer Points Adjusted',
-        module: 'Customers',
-        details: 'Added 50 points to customer John Doe',
-        ipAddress: '192.168.1.101',
-      },
-    }),
-    prisma.auditLog.create({
-      data: {
-        userId: adminUser.id,
-        action: 'Settings Changed',
-        module: 'Settings',
-        details: 'Updated tax rate from 8% to 8.5%',
-        ipAddress: '192.168.1.100',
+        supplierId: suppliers[2].id, branchId: branch.id, status: 'PENDING', total: 825,
+        items: { create: [
+          { productId: products[11].id, quantity: 50, cost: 4.50 },
+          { productId: products[12].id, quantity: 50, cost: 12.00 },
+        ]},
       },
     }),
   ]);
-  console.log('✅ Audit Logs created');
+  console.log('✅ Purchase orders created');
 
+  // ─── 12. Audit Logs ───────────────────────────────────────────────────────
+  await Promise.all([
+    prisma.auditLog.create({ data: { userId: adminUser.id,  action: 'User Login',     module: 'Authentication', details: 'Admin logged in',                  ipAddress: '192.168.1.100' } }),
+    prisma.auditLog.create({ data: { userId: cashierUser.id,action: 'Order Created',  module: 'POS',            details: 'Created first seeded order',        ipAddress: '192.168.1.101' } }),
+    prisma.auditLog.create({ data: { userId: adminUser.id,  action: 'Product Added',  module: 'Inventory',      details: 'Added Wireless Earbuds to catalogue',ipAddress: '192.168.1.100' } }),
+    prisma.auditLog.create({ data: { userId: adminUser.id,  action: 'Employee Added', module: 'HR',             details: 'Onboarded Sarah Thompson',          ipAddress: '192.168.1.100' } }),
+  ]);
+  console.log('✅ Audit logs created');
+
+  // ─── 13. Settings ─────────────────────────────────────────────────────────
+  await Promise.all([
+    prisma.setting.create({ data: { key: 'tax_rate',     value: '0.08' } }),
+    prisma.setting.create({ data: { key: 'currency',     value: 'USD' } }),
+    prisma.setting.create({ data: { key: 'app_name',     value: 'Nexus POS' } }),
+    prisma.setting.create({ data: { key: 'timezone',     value: 'America/New_York' } }),
+  ]);
+  console.log('✅ Settings created');
+
+  console.log('');
   console.log('🎉 Seed complete!');
+  console.log(`   Branch   : ${branch.name}`);
+  console.log(`   Products : ${products.length}`);
+  console.log(`   Customers: ${customers.length}`);
+  console.log(`   Orders   : ${orderDates.length} (last 30 days)`);
 }
 
 main()

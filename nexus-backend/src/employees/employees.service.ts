@@ -5,8 +5,11 @@ import { PrismaService } from '../prisma/prisma.service';
 export class EmployeesService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll() {
+  async findAll(branchId: string) {
     const employees = await this.prisma.employee.findMany({
+      where: {
+        user: { branchId },
+      },
       include: {
         user: true,
       },
@@ -47,7 +50,7 @@ export class EmployeesService {
     };
   }
 
-  async create(dto: any) {
+  async create(dto: any, branchId: string) {
     // First create a user for the employee
     const user = await this.prisma.user.create({
       data: {
@@ -56,6 +59,7 @@ export class EmployeesService {
         name: dto.name,
         role: 'CASHIER',
         permissions: [],
+        branchId,
       },
     });
 

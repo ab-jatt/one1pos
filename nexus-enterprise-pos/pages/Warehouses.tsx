@@ -166,7 +166,6 @@ const Warehouses: React.FC = () => {
     }
     try {
       await Api.warehouseMovements.transfer({
-        branchId: 'main-branch-id',
         ...transferForm,
         items: validItems,
       });
