@@ -5,7 +5,9 @@ import Navbar from './components/Navbar';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { CurrencyProvider } from './context/CurrencyContext';
+import { ToastProvider } from './context/ToastContext';
 import { Role } from './types';
+import { getFirstAuthorizedRoute } from './utils/roleRoutes';
 
 // ─── Lazy-loaded page components (code splitting) ───
 // Each page becomes its own JS chunk, loaded on demand
@@ -65,7 +67,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
 };
 
 const AppContent: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const location = useLocation();
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -74,6 +76,12 @@ const AppContent: React.FC = () => {
     }
     return false;
   });
+
+  // Get the first authorized route for the user's role
+  const getAuthenticatedRedirect = () => {
+    if (!user || !user.role) return '/login';
+    return getFirstAuthorizedRoute(user.role) || '/unauthorized';
+  };
 
   useEffect(() => {
     if (darkMode) {
@@ -93,8 +101,8 @@ const AppContent: React.FC = () => {
        <div className="min-h-screen bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-50 font-sans selection:bg-sky-500 selection:text-white transition-colors duration-300">
          <Suspense fallback={<PageLoader />}>
          <Routes>
-           <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" /> : <LandingPage />} />
-           <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login />} />
+           <Route path="/" element={isAuthenticated ? <Navigate to={getAuthenticatedRedirect()} /> : <LandingPage />} />
+           <Route path="/login" element={isAuthenticated ? <Navigate to={getAuthenticatedRedirect()} /> : <Login />} />
            <Route path="/auth/callback" element={<AuthCallback />} />
          </Routes>
          </Suspense>
@@ -109,8 +117,8 @@ const AppContent: React.FC = () => {
       <main className="flex-1 p-4 lg:p-6 max-w-screen-2xl mx-auto w-full">
         <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" />} />
-          <Route path="/login" element={<Navigate to="/dashboard" />} />
+          <Route path="/" element={<Navigate to={getAuthenticatedRedirect()} />} />
+          <Route path="/login" element={<Navigate to={getAuthenticatedRedirect()} />} />
           <Route path="/unauthorized" element={<ProtectedRoute><Unauthorized /></ProtectedRoute>} />
           
           {/* Dashboard: Admin & Manager */}
@@ -238,9 +246,11 @@ const App: React.FC = () => {
     <HashRouter>
       <LanguageProvider>
         <CurrencyProvider>
-          <AuthProvider>
-            <AppContent />
-          </AuthProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <AppContent />
+            </AuthProvider>
+          </ToastProvider>
         </CurrencyProvider>
       </LanguageProvider>
     </HashRouter>
