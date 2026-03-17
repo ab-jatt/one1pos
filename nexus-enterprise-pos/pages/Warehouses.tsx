@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Warehouse, Plus, Search, Edit2, Trash2, MapPin, ArrowRightLeft, Package, X, Eye } from 'lucide-react';
 import { Api } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 interface WarehouseData {
   id: string;
@@ -52,6 +53,7 @@ const warehouseTypes = [
 const getTypeStyle = (type: string) => warehouseTypes.find(t => t.value === type) || warehouseTypes[4];
 
 const Warehouses: React.FC = () => {
+  const { showSuccess, showError, showWarning } = useToast();
   const [activeTab, setActiveTab] = useState<'warehouses' | 'transfers'>('warehouses');
   const [warehouses, setWarehouses] = useState<WarehouseData[]>([]);
   const [transfers, setTransfers] = useState<TransferData[]>([]);
@@ -111,7 +113,7 @@ const Warehouses: React.FC = () => {
 
   const handleCreate = async () => {
     if (!form.name.trim() || !form.code.trim()) {
-      alert('Please fill in warehouse name and code');
+      showWarning('Please fill in warehouse name and code');
       return;
     }
     try {
@@ -120,7 +122,7 @@ const Warehouses: React.FC = () => {
       setForm({ name: '', code: '', type: 'GENERAL', address: '', isDefault: false });
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to create warehouse');
+      showError(err.response?.data?.message || 'Failed to create warehouse');
     }
   };
 
@@ -133,7 +135,7 @@ const Warehouses: React.FC = () => {
       setForm({ name: '', code: '', type: 'GENERAL', address: '', isDefault: false });
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to update warehouse');
+      showError(err.response?.data?.message || 'Failed to update warehouse');
     }
   };
 
@@ -143,7 +145,7 @@ const Warehouses: React.FC = () => {
       await Api.warehouses.delete(id);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to delete warehouse');
+      showError(err.response?.data?.message || 'Failed to delete warehouse');
     }
   };
 
@@ -161,7 +163,7 @@ const Warehouses: React.FC = () => {
   const handleTransfer = async () => {
     const validItems = transferForm.items.filter(i => i.productId && i.quantity > 0);
     if (!transferForm.fromWarehouseId || !transferForm.toWarehouseId || validItems.length === 0) {
-      alert('Please fill all required fields');
+      showWarning('Please fill all required fields');
       return;
     }
     try {
@@ -174,7 +176,7 @@ const Warehouses: React.FC = () => {
       fetchTransfers();
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Transfer failed');
+      showError(err.response?.data?.message || 'Transfer failed');
     }
   };
 

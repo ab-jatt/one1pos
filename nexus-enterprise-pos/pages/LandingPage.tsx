@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useCurrency } from '../context/CurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
+import type { Language } from '../context/LanguageContext';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -47,7 +48,7 @@ const LandingPage: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLanguageChange = (newLanguage: 'en' | 'es' | 'ru' | 'de') => {
+  const handleLanguageChange = (newLanguage: Language) => {
     setLanguage(newLanguage);
     setShowLanguageMenu(false);
   };
@@ -161,7 +162,7 @@ const LandingPage: React.FC = () => {
                 {showLanguageMenu && (
                   <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg shadow-xl overflow-hidden z-50 animate-dropdown-open">
                     <div className="py-1">
-                    {(['en', 'es', 'ru', 'de'] as const).map((lang) => (
+                    {(['en', 'es', 'ru', 'de', 'ur', 'ar'] as const).map((lang) => (
                       <button
                         key={lang}
                         onClick={() => handleLanguageChange(lang)}

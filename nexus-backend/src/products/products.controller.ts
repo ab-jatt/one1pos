@@ -44,8 +44,8 @@ export class ProductsController {
   }
 
   @Post()
-  create(@Body() createProductDto: CreateProductDto) {
-    return this.productsService.create(createProductDto);
+  create(@Body() createProductDto: CreateProductDto, @Req() req: any) {
+    return this.productsService.create(createProductDto, req.user.branchId, req.user.id);
   }
 
   @Get()
@@ -60,8 +60,8 @@ export class ProductsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.productsService.findOne(id);
+  findOne(@Param('id') id: string, @Req() req: any) {
+    return this.productsService.findOne(id, req.user.branchId);
   }
 
   @Get(':id/ledger')
@@ -75,12 +75,12 @@ export class ProductsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
-    return this.productsService.update(id, updateProductDto);
+  update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto, @Req() req: any) {
+    return this.productsService.update(id, updateProductDto, req.user.branchId);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.productsService.remove(id);
+  remove(@Param('id') id: string, @Req() req: any) {
+    return this.productsService.remove(id, req.user.branchId);
   }
 }

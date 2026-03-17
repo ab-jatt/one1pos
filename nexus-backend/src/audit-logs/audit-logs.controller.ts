@@ -12,6 +12,6 @@ export class AuditLogsController {
 
   @Post()
   create(@Req() req: any, @Body() dto: any) {
-    return this.auditLogsService.create(dto, req.user.userId);
+    return this.auditLogsService.create(dto, req.user.userId, req.user.branchId);
   }
 }

@@ -21,42 +21,42 @@ export class ProductionOrdersController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.productionService.findOne(id);
+  findOne(@Param('id') id: string, @Req() req: any) {
+    return this.productionService.findOne(id, req.user.branchId);
   }
 
   @Post()
   create(@Req() req: any, @Body() dto: any) {
-    return this.productionService.create({ ...dto, branchId: req.user.branchId });
+    return this.productionService.create(dto, req.user.branchId);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: any) {
-    return this.productionService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
+    return this.productionService.update(id, dto, req.user.branchId);
   }
 
   @Post(':id/issue')
-  issueMaterials(@Param('id') id: string, @Body() dto: any) {
-    return this.productionService.issueMaterials(id, dto);
+  issueMaterials(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
+    return this.productionService.issueMaterials(id, dto, req.user.branchId);
   }
 
   @Post(':id/receive')
-  receiveGoods(@Param('id') id: string, @Body() dto: any) {
-    return this.productionService.receiveGoods(id, dto);
+  receiveGoods(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
+    return this.productionService.receiveGoods(id, dto, req.user.branchId);
   }
 
   @Post(':id/return')
-  returnMaterials(@Param('id') id: string, @Body() dto: any) {
-    return this.productionService.returnMaterials(id, dto);
+  returnMaterials(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
+    return this.productionService.returnMaterials(id, dto, req.user.branchId);
   }
 
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body('status') status: string) {
-    return this.productionService.updateStatus(id, status);
+  updateStatus(@Param('id') id: string, @Body('status') status: string, @Req() req: any) {
+    return this.productionService.updateStatus(id, status, req.user.branchId);
   }
 
   @Delete(':id')
-  cancel(@Param('id') id: string) {
-    return this.productionService.cancel(id);
+  cancel(@Param('id') id: string, @Req() req: any) {
+    return this.productionService.cancel(id, req.user.branchId);
   }
 }

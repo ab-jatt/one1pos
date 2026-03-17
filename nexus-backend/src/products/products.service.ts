@@ -1,13 +1,28 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
-  private async generateProductCode(): Promise<string> {
+  private async generateSku(branchId: string): Promise<string> {
     const last = await this.prisma.product.findFirst({
-      where: { productCode: { startsWith: 'PRD-' } },
+      where: { branchId, sku: { startsWith: 'SKU-' } },
+      orderBy: { sku: 'desc' },
+      select: { sku: true },
+    });
+    const nextNum = last?.sku
+      ? parseInt(last.sku.replace('SKU-', ''), 10) + 1
+      : 1;
+    const sku = `SKU-${String(nextNum).padStart(6, '0')}`;
+    const exists = await this.prisma.product.findFirst({ where: { branchId, sku } });
+    return exists ? `SKU-${Date.now()}` : sku;
+  }
+
+  private async generateProductCode(branchId: string): Promise<string> {
+    const last = await this.prisma.product.findFirst({
+      where: { branchId, productCode: { startsWith: 'PRD-' } },
       orderBy: { productCode: 'desc' },
       select: { productCode: true },
     });
@@ -16,15 +31,16 @@ export class ProductsService {
       : 1;
     const code = `PRD-${String(nextNum).padStart(6, '0')}`;
     // Safety check: if this code is already taken (race condition), fall back to timestamp
-    const exists = await this.prisma.product.findUnique({ where: { productCode: code } });
+    const exists = await this.prisma.product.findFirst({ where: { branchId, productCode: code } });
     return exists ? `PRD-${Date.now()}` : code;
   }
 
   async findAll(branchId: string) {
     const products = await this.prisma.product.findMany({
-      where: { deletedAt: null },
+      where: { branchId, deletedAt: null },
       include: {
         category: true,
+        subcategory: true,
         stocks: {
           where: { branchId },
         },
@@ -45,22 +61,29 @@ export class ProductsService {
       costPrice: Number(product.costPrice),
       category: product.category?.name || 'Uncategorized',
       categoryId: product.categoryId,
+      subcategory: product.subcategory?.name || null,
+      subcategoryId: product.subcategoryId || null,
       stock: product.stocks.reduce((sum, s) => sum + s.quantity, 0),
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
     }));
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, branchId?: string) {
     const product = await this.prisma.product.findUnique({
       where: { id },
       include: {
         category: true,
+        subcategory: true,
         stocks: true,
       },
     });
 
     if (!product || product.deletedAt) {
+      throw new NotFoundException(`Product with ID ${id} not found`);
+    }
+
+    if (branchId && product.branchId !== branchId) {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
 
@@ -76,6 +99,8 @@ export class ProductsService {
       costPrice: Number(product.costPrice),
       category: product.category?.name || 'Uncategorized',
       categoryId: product.categoryId,
+      subcategory: product.subcategory?.name || null,
+      subcategoryId: product.subcategoryId || null,
       stock: product.stocks.reduce((sum, s) => sum + s.quantity, 0),
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
@@ -85,6 +110,7 @@ export class ProductsService {
   async search(q: string, branchId: string) {
     const products = await this.prisma.product.findMany({
       where: {
+        branchId,
         deletedAt: null,
         OR: [
           { productCode: q },
@@ -95,6 +121,7 @@ export class ProductsService {
       },
       include: {
         category: true,
+        subcategory: true,
         stocks: { where: { branchId } },
       },
       orderBy: { createdAt: 'desc' },
@@ -112,89 +139,147 @@ export class ProductsService {
       costPrice: Number(product.costPrice),
       category: product.category?.name || 'Uncategorized',
       categoryId: product.categoryId,
+      subcategory: product.subcategory?.name || null,
+      subcategoryId: product.subcategoryId || null,
       stock: product.stocks.reduce((sum, s) => sum + s.quantity, 0),
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
     }));
   }
 
-  async create(data: any) {
-    const productCode = data.productCode || (await this.generateProductCode());
+  async create(data: any, branchId: string, userId?: string) {
+    // productCode is always auto-generated; client-supplied value is ignored
+    const productCode = await this.generateProductCode(branchId);
+    const sku = data.sku?.trim() || (await this.generateSku(branchId));
+    const openingStock = Math.max(0, Number(data.stock) || 0);
 
-    const product = await this.prisma.product.create({
-      data: {
-        name: data.name,
-        sku: data.sku,
-        productCode,
-        barcode: data.barcode || null,
-        description: data.description,
-        image: data.image,
-        price: data.price,
-        costPrice: data.costPrice,
-        categoryId: data.categoryId,
-      },
-      include: {
-        category: true,
-      },
-    });
-
-    // Create initial stock if branchId provided
-    if (data.branchId && data.stock !== undefined) {
-      await this.prisma.stock.create({
-        data: {
-          branchId: data.branchId,
-          productId: product.id,
-          quantity: data.stock || 0,
-        },
-      });
-    }
-
-    return this.findOne(product.id);
-  }
-
-  async update(id: string, data: any) {
-    await this.findOne(id); // Check if exists
-
-    const product = await this.prisma.product.update({
-      where: { id },
-      data: {
-        name: data.name,
-        sku: data.sku,
-        ...(data.productCode !== undefined && { productCode: data.productCode }),
-        ...(data.barcode !== undefined && { barcode: data.barcode || null }),
-        description: data.description,
-        image: data.image,
-        price: data.price,
-        costPrice: data.costPrice,
-        categoryId: data.categoryId,
-      },
-    });
-
-    // Update stock if provided
-    if (data.branchId && data.stock !== undefined) {
-      await this.prisma.stock.upsert({
-        where: {
-          branchId_productId: {
-            branchId: data.branchId,
-            productId: id,
+    try {
+      const product = await this.prisma.$transaction(async (tx) => {
+        const createdProduct = await tx.product.create({
+          data: {
+            name: data.name,
+            sku,
+            productCode,
+            barcode: data.barcode || null,
+            description: data.description,
+            image: data.image,
+            price: data.price,
+            costPrice: data.costPrice,
+            categoryId: data.categoryId,
+            subcategoryId: data.subcategoryId || null,
+            branchId,
           },
+        });
+
+        const stock = await tx.stock.create({
+          data: {
+            branchId,
+            productId: createdProduct.id,
+            quantity: openingStock,
+          },
+        });
+
+        if (data.stock !== undefined) {
+          await tx.stockMovement.create({
+            data: {
+              stockId: stock.id,
+              type: 'OPENING_STOCK' as any,
+              reason: 'Product creation',
+              referenceId: createdProduct.id,
+              createdById: userId,
+              openingStock: 0,
+              quantityIn: openingStock,
+              quantityOut: 0,
+              closingStock: openingStock,
+            },
+          });
+        }
+
+        return createdProduct;
+      });
+
+      return this.findOne(product.id, branchId);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const target = (error.meta?.target as string[]) || [];
+        if (target.includes('sku')) {
+          throw new ConflictException(`A product with SKU "${sku}" already exists in this store.`);
+        }
+        if (target.includes('barcode')) {
+          throw new ConflictException(`A product with barcode "${data.barcode}" already exists in this store.`);
+        }
+        if (target.includes('productCode')) {
+          throw new ConflictException(`A product with code "${productCode}" already exists in this store.`);
+        }
+        throw new ConflictException('A product with these details already exists.');
+      }
+      throw error;
+    }
+  }
+
+  async update(id: string, data: any, branchId: string) {
+    const existing = await this.findOne(id, branchId); // Check if exists and belongs to branch
+
+    // Product code is immutable after creation — reject any attempt to change it
+    if (data.productCode !== undefined && data.productCode !== existing.productCode) {
+      throw new BadRequestException('Product code cannot be modified after creation.');
+    }
+
+    try {
+      const product = await this.prisma.product.update({
+        where: { id },
+        data: {
+          name: data.name,
+          sku: data.sku,
+          // productCode is intentionally excluded — it is immutable
+          ...(data.barcode !== undefined && { barcode: data.barcode || null }),
+          description: data.description,
+          image: data.image,
+          price: data.price,
+          costPrice: data.costPrice,
+          categoryId: data.categoryId,
+          ...(data.subcategoryId !== undefined && { subcategoryId: data.subcategoryId || null }),
         },
-        update: {
-          quantity: data.stock,
-        },
-        create: {
-          branchId: data.branchId,
-          productId: id,
-          quantity: data.stock,
-        },
+      });
+
+      // Update stock if provided
+      if (data.stock !== undefined) {
+        await this.prisma.stock.upsert({
+          where: {
+            branchId_productId: {
+              branchId,
+              productId: id,
+            },
+          },
+          update: {
+            quantity: data.stock,
+          },
+          create: {
+            branchId,
+            productId: id,
+            quantity: data.stock,
+          },
       });
     }
 
     return this.findOne(product.id);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const target = (error.meta?.target as string[]) || [];
+        if (target.includes('sku')) {
+          throw new ConflictException(`A product with SKU "${data.sku}" already exists in this store.`);
+        }
+        if (target.includes('barcode')) {
+          throw new ConflictException(`A product with barcode "${data.barcode}" already exists in this store.`);
+        }
+        throw new ConflictException('A product with these details already exists.');
+      }
+      throw error;
+    }
   }
 
-  async remove(id: string) {
-    await this.findOne(id); // Check if exists
+  async remove(id: string, branchId: string) {
+    await this.findOne(id, branchId); // Check if exists and belongs to branch
 
     // Soft delete
     return this.prisma.product.update({

@@ -43,8 +43,6 @@ services:
       # Hostname 'postgres' resolves to the postgres container via nexus_network
       DATABASE_URL: postgresql://${POSTGRES_USER:-nexus}:${POSTGRES_PASSWORD:-nexus_secret}@postgres:5432/${POSTGRES_DB:-nexus_pos}
       JWT_SECRET:   ${JWT_SECRET:-local-dev-secret-change-in-production}
-      SUPABASE_URL: ${SUPABASE_URL:-}
-      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
     command: >
       sh -c "node_modules/.bin/prisma migrate deploy &&

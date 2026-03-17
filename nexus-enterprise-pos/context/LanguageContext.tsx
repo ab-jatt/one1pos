@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
 import { getTranslation, translations } from '../translations/translations';
+import { Api } from '../services/api';
 
-export type Language = 'en' | 'es' | 'ru' | 'de';
+export type Language = 'en' | 'es' | 'ru' | 'de' | 'ur' | 'ar';
 
 interface LanguageContextType {
   language: Language;
@@ -10,6 +11,9 @@ interface LanguageContextType {
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+
+const isSupportedLanguage = (lang: string): lang is Language =>
+  ['en', 'es', 'ru', 'de', 'ur', 'ar'].includes(lang);
 
 export const useLanguage = () => {
   const context = useContext(LanguageContext);
@@ -29,13 +33,46 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     return saved || 'en';
   });
 
-  const setLanguage = (lang: Language) => {
+  useEffect(() => {
+    const applyStoreSettings = async () => {
+      if (!localStorage.getItem('nexus_auth_token')) return;
+
+      try {
+        const settings = await Api.settings.get();
+        if (!isSupportedLanguage(settings.language)) {
+          return;
+        }
+
+        setLanguageState(settings.language);
+        localStorage.setItem('appLanguage', settings.language);
+        localStorage.setItem('loginLanguage', settings.language);
+      } catch {
+        // Keep current language if settings service is unavailable.
+      }
+    };
+
+    applyStoreSettings();
+
+    const onSettingsChanged = () => {
+      applyStoreSettings();
+    };
+
+    window.addEventListener('nexus-auth-changed', onSettingsChanged);
+    window.addEventListener('store-settings-updated', onSettingsChanged);
+
+    return () => {
+      window.removeEventListener('nexus-auth-changed', onSettingsChanged);
+      window.removeEventListener('store-settings-updated', onSettingsChanged);
+    };
+  }, []);
+
+  const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
     localStorage.setItem('appLanguage', lang);
     localStorage.setItem('loginLanguage', lang); // Sync with login
     // Dispatch storage event for other components
     window.dispatchEvent(new Event('storage'));
-  };
+  }, []);
 
   const t = (key: string): string => {
     return getTranslation(language, key);

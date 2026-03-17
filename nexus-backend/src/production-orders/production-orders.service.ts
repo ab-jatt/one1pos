@@ -6,13 +6,12 @@ import { ProductionOrderStatus } from '@prisma/client';
 export class ProductionOrdersService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(filters: { branchId?: string; status?: string; page?: number; limit?: number }) {
+  async findAll(filters: { branchId: string; status?: string; page?: number; limit?: number }) {
     const page = filters.page || 1;
     const limit = filters.limit || 50;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
-    if (filters.branchId) where.branchId = filters.branchId;
+    const where: any = { branchId: filters.branchId };
     if (filters.status) where.status = filters.status as ProductionOrderStatus;
 
     const [orders, total] = await Promise.all([
@@ -36,7 +35,7 @@ export class ProductionOrdersService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, branchId?: string) {
     const order = await this.prisma.productionOrder.findUnique({
       where: { id },
       include: {
@@ -48,16 +47,17 @@ export class ProductionOrdersService {
     });
 
     if (!order) throw new NotFoundException(`Production Order ${id} not found`);
+    if (branchId && order.branchId !== branchId) throw new NotFoundException(`Production Order ${id} not found`);
     return this.formatOrder(order);
   }
 
-  async create(dto: any) {
-    const count = await this.prisma.productionOrder.count();
+  async create(dto: any, branchId: string) {
+    const count = await this.prisma.productionOrder.count({ where: { branchId } });
     const orderNumber = `PRD-${String(count + 1).padStart(6, '0')}`;
 
     const order = await this.prisma.productionOrder.create({
       data: {
-        branchId: dto.branchId || 'main-branch-id',
+        branchId,
         orderNumber,
         productId: dto.productId,
         quantity: dto.quantity,
@@ -85,9 +85,10 @@ export class ProductionOrdersService {
     return this.formatOrder(order);
   }
 
-  async update(id: string, dto: any) {
+  async update(id: string, dto: any, branchId?: string) {
     const order = await this.prisma.productionOrder.findUnique({ where: { id } });
     if (!order) throw new NotFoundException(`Production Order ${id} not found`);
+    if (branchId && order.branchId !== branchId) throw new NotFoundException(`Production Order ${id} not found`);
 
     if (order.status !== 'DRAFT') {
       throw new BadRequestException('Can only update draft production orders');
@@ -119,13 +120,14 @@ export class ProductionOrdersService {
     warehouseId: string;
     items: Array<{ productionOrderItemId: string; quantity: number }>;
     createdById?: string;
-  }) {
+  }, branchId?: string) {
     const order = await this.prisma.productionOrder.findUnique({
       where: { id },
       include: { items: { include: { product: true } } },
     });
 
     if (!order) throw new NotFoundException(`Production Order ${id} not found`);
+    if (branchId && order.branchId !== branchId) throw new NotFoundException(`Production Order ${id} not found`);
     if (order.status === 'COMPLETED' || order.status === 'RECEIVED' || order.status === 'CANCELLED') {
       throw new BadRequestException(`Cannot issue materials for ${order.status} order`);
     }
@@ -253,13 +255,14 @@ export class ProductionOrdersService {
     warehouseId: string;
     quantity: number;
     createdById?: string;
-  }) {
+  }, branchId?: string) {
     const order = await this.prisma.productionOrder.findUnique({
       where: { id },
       include: { product: true, items: { include: { product: true } } },
     });
 
     if (!order) throw new NotFoundException(`Production Order ${id} not found`);
+    if (branchId && order.branchId !== branchId) throw new NotFoundException(`Production Order ${id} not found`);
     if (order.status === 'RECEIVED' || order.status === 'CANCELLED') {
       throw new BadRequestException(`Cannot receive goods for ${order.status} order`);
     }
@@ -373,13 +376,14 @@ export class ProductionOrdersService {
     warehouseId: string;
     items: Array<{ productionOrderItemId: string; quantity: number }>;
     createdById?: string;
-  }) {
+  }, branchId?: string) {
     const order = await this.prisma.productionOrder.findUnique({
       where: { id },
       include: { items: { include: { product: true } } },
     });
 
     if (!order) throw new NotFoundException(`Production Order ${id} not found`);
+    if (branchId && order.branchId !== branchId) throw new NotFoundException(`Production Order ${id} not found`);
 
     const result = await this.prisma.$transaction(async (tx) => {
       let totalReturnCost = 0;
@@ -473,9 +477,10 @@ export class ProductionOrdersService {
   /**
    * Update production order status
    */
-  async updateStatus(id: string, status: string) {
+  async updateStatus(id: string, status: string, branchId?: string) {
     const order = await this.prisma.productionOrder.findUnique({ where: { id } });
     if (!order) throw new NotFoundException(`Production Order ${id} not found`);
+    if (branchId && order.branchId !== branchId) throw new NotFoundException(`Production Order ${id} not found`);
 
     const updated = await this.prisma.productionOrder.update({
       where: { id },
@@ -497,9 +502,10 @@ export class ProductionOrdersService {
   /**
    * Cancel production order
    */
-  async cancel(id: string) {
+  async cancel(id: string, branchId?: string) {
     const order = await this.prisma.productionOrder.findUnique({ where: { id } });
     if (!order) throw new NotFoundException(`Production Order ${id} not found`);
+    if (branchId && order.branchId !== branchId) throw new NotFoundException(`Production Order ${id} not found`);
     if (order.status === 'RECEIVED') {
       throw new BadRequestException('Cannot cancel a received production order');
     }

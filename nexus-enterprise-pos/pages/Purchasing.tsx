@@ -5,7 +5,8 @@ import { Api } from '../services/api';
 import { PurchaseOrder, Supplier, Product } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
-import { ShoppingBag, Plus, Calendar, CheckCircle, Clock, Search, X, Save, Trash2, Printer, FileText, Package, TrendingUp, Filter, Check, XCircle } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
+import { ShoppingBag, Plus, Calendar, CheckCircle, Clock, Search, X, Save, Trash2, Printer, FileText, Package, TrendingUp, Filter, Check, XCircle, Edit2, Lock } from 'lucide-react';
 import Dropdown from '../components/ui/Dropdown';
 
 interface LineItem {
@@ -19,6 +20,7 @@ interface LineItem {
 const Purchasing: React.FC = () => {
   const { t = (key: string) => key } = useLanguage() || {};
   const { formatMoney = (val: number) => `$${val.toFixed(2)}` } = useCurrency() || {};
+  const { showSuccess, showError, showWarning } = useToast();
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -29,15 +31,19 @@ const Purchasing: React.FC = () => {
 
   // Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingPoId, setEditingPoId] = useState<string | null>(null);
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   
   // Form State
   const [supplierId, setSupplierId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [status, setStatus] = useState<'Pending' | 'Received'>('Pending');
+  const [status, setStatus] = useState<'Pending' | 'Approved' | 'Received' | 'Cancelled'>('Pending');
+  const [notes, setNotes] = useState('');
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { id: Date.now(), productId: '', productName: '', quantity: 1, cost: 0 }
   ]);
+
+  const isLocked = status === 'Approved' || status === 'Received' || status === 'Cancelled';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -83,16 +89,51 @@ const Purchasing: React.FC = () => {
     return lineItems.reduce((sum, item) => sum + (item.quantity * item.cost), 0);
   };
 
-  const handleCreatePO = async () => {
+  const resetForm = () => {
+    setSupplierId('');
+    setDate(new Date().toISOString().split('T')[0]);
+    setStatus('Pending');
+    setNotes('');
+    setLineItems([{ id: Date.now(), productId: '', productName: '', quantity: 1, cost: 0 }]);
+    setEditingPoId(null);
+  };
+
+  const handleEditPO = async (poId: string) => {
+    try {
+      const po = await Api.purchasing.getPO(poId);
+
+      const poStatus = (po.status || 'Pending') as 'Pending' | 'Approved' | 'Received' | 'Cancelled';
+      setEditingPoId(po.id);
+      setSupplierId(po.supplierId || '');
+      setDate(po.expectedDeliveryDate || po.date || new Date().toISOString().split('T')[0]);
+      setStatus(poStatus);
+      setNotes(po.notes || '');
+      setLineItems(
+        (po.items || []).map((item: any, idx: number) => ({
+          id: Date.now() + idx,
+          productId: item.productId,
+          productName: item.productName || '',
+          quantity: Number(item.quantity || 0),
+          cost: Number(item.unitCost || item.cost || 0),
+        })),
+      );
+      setIsCreateModalOpen(true);
+    } catch (error) {
+      console.error('Failed to load PO for editing:', error);
+      showError('Failed to load purchase order details.');
+    }
+  };
+
+  const handleSavePO = async () => {
     if (!supplierId) {
-      alert('Please select a supplier');
+      showWarning('Please select a supplier');
       return;
     }
     
     // Filter out line items without a product selected
     const validItems = lineItems.filter(item => item.productId);
     if (validItems.length === 0) {
-      alert('Please add at least one product');
+      showWarning('Please add at least one product');
       return;
     }
 
@@ -100,6 +141,8 @@ const Purchasing: React.FC = () => {
     const payload = {
       supplierId,
       status,
+      notes,
+      expectedDeliveryDate: date,
       items: validItems.map(item => ({
         productId: item.productId,
         quantity: item.quantity,
@@ -108,18 +151,20 @@ const Purchasing: React.FC = () => {
     };
 
     try {
-      const createdPO = await Api.purchasing.createPO(payload);
-      setOrders([createdPO, ...orders]);
+      if (editingPoId) {
+        const updatedPO = await Api.purchasing.updatePO(editingPoId, payload);
+        setOrders(orders.map(po => po.id === editingPoId ? updatedPO : po));
+        showSuccess('Purchase order updated successfully.');
+      } else {
+        const createdPO = await Api.purchasing.createPO(payload);
+        setOrders([createdPO, ...orders]);
+        showSuccess('Purchase order created successfully.');
+      }
       setIsCreateModalOpen(false);
-      
-      // Reset form
-      setSupplierId('');
-      setDate(new Date().toISOString().split('T')[0]);
-      setStatus('Pending');
-      setLineItems([{ id: Date.now(), productId: '', productName: '', quantity: 1, cost: 0 }]);
+      resetForm();
     } catch (error) {
-      console.error('Failed to create PO:', error);
-      alert('Failed to create purchase order. Please try again.');
+      console.error('Failed to save PO:', error);
+      showError('Failed to save purchase order. Please try again.');
     }
   };
 
@@ -133,7 +178,7 @@ const Purchasing: React.FC = () => {
       setOrders(orders.map(po => po.id === poId ? updatedPO : po));
     } catch (error) {
       console.error('Failed to update PO status:', error);
-      alert('Failed to update status. Please try again.');
+      showError('Failed to update status. Please try again.');
     }
   };
 
@@ -154,7 +199,10 @@ const Purchasing: React.FC = () => {
           </p>
         </div>
         <button 
-          onClick={() => setIsCreateModalOpen(true)}
+          onClick={() => {
+            resetForm();
+            setIsCreateModalOpen(true);
+          }}
           className="flex items-center gap-2 px-6 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg shadow-sm transition-all group"
         >
           <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" /> <span className="font-bold tracking-wide text-sm">{t('newOrder')}</span>
@@ -224,6 +272,7 @@ const Purchasing: React.FC = () => {
             options={[
               { value: 'All', label: t('allStatuses') },
               { value: 'Pending', label: t('pending') },
+              { value: 'Approved', label: t('approved') || 'Approved' },
               { value: 'Received', label: t('received') },
               { value: 'Cancelled', label: t('cancelled') },
             ]}
@@ -253,7 +302,7 @@ const Purchasing: React.FC = () => {
                 <tr><td colSpan={7} className="text-center py-12 font-mono">{t('accessingDatabase')}</td></tr>
               ) : filteredOrders.map((po) => (
                 <tr key={po.id} className="hover:bg-orange-50/30 dark:hover:bg-orange-900/10 transition-colors group">
-                  <td className="px-6 py-4 font-mono font-bold text-orange-600 dark:text-orange-400 group-hover:text-orange-500 transition-colors">{po.id}</td>
+                  <td className="px-6 py-4 font-mono font-bold text-orange-600 dark:text-orange-400 group-hover:text-orange-500 transition-colors">{po.poNumber || po.id}</td>
                   <td className="px-6 py-4 font-medium text-neutral-900 dark:text-neutral-100">{po.supplier}</td>
                   <td className="px-6 py-4 flex items-center gap-2 font-mono text-xs">
                     <Calendar className="w-3 h-3 text-neutral-400" />
@@ -269,6 +318,7 @@ const Purchasing: React.FC = () => {
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
                       po.status === 'Received' ? 'bg-green-100/10 text-green-600 dark:text-green-400 border-green-500/30' :
+                      po.status === 'Approved' ? 'bg-sky-100/10 text-sky-600 dark:text-sky-400 border-sky-500/30' :
                       po.status === 'Pending' ? 'bg-orange-100/10 text-orange-600 dark:text-orange-400 border-orange-500/30' :
                       'bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-neutral-300 border-gray-200 dark:border-neutral-600'
                     }`}>
@@ -280,6 +330,37 @@ const Purchasing: React.FC = () => {
                     <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                         {po.status === 'Pending' && (
                           <>
+                            <button 
+                                onClick={() => handleEditPO(po.id)}
+                                className="p-1.5 text-sky-500 hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded-lg transition-colors"
+                                title="Edit PO"
+                            >
+                                <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button 
+                                onClick={() => handleUpdateStatus(po.id, 'Approved')}
+                                className="p-1.5 text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                title="Approve PO"
+                            >
+                                <Check className="w-4 h-4" />
+                            </button>
+                            <button 
+                                onClick={() => handleUpdateStatus(po.id, 'Cancelled')}
+                                className="p-1.5 text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                title="Cancel PO"
+                            >
+                                <XCircle className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                        {po.status === 'Approved' && (
+                          <>
+                            <span
+                              className="p-1.5 text-neutral-400"
+                              title="Approved purchase order is locked for editing"
+                            >
+                              <Lock className="w-4 h-4" />
+                            </span>
                             <button 
                                 onClick={() => handleUpdateStatus(po.id, 'Received')}
                                 className="p-1.5 text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
@@ -331,9 +412,17 @@ const Purchasing: React.FC = () => {
             <div className="p-5 border-b border-neutral-200 dark:border-neutral-800 flex justify-between items-center bg-neutral-50 dark:bg-neutral-900">
                <h3 className="font-bold text-lg text-neutral-800 dark:text-white flex items-center gap-2">
                  <ShoppingBag className="w-5 h-5 text-orange-500" /> 
-                 <span className="uppercase tracking-wide text-sm">{t('newPurchaseOrder')}</span>
+                 <span className="uppercase tracking-wide text-sm">
+                   {editingPoId ? (t('editPurchaseOrder') || 'Edit Purchase Order') : t('newPurchaseOrder')}
+                 </span>
                </h3>
-               <button onClick={() => setIsCreateModalOpen(false)} className="text-neutral-500 hover:text-neutral-700 dark:hover:text-white transition-colors">
+               <button
+                 onClick={() => {
+                   setIsCreateModalOpen(false);
+                   resetForm();
+                 }}
+                 className="text-neutral-500 hover:text-neutral-700 dark:hover:text-white transition-colors"
+               >
                  <X className="w-5 h-5" />
                </button>
             </div>
@@ -352,15 +441,17 @@ const Purchasing: React.FC = () => {
                       onChange={(val) => setSupplierId(val)}
                       placeholder={t('chooseVendor')}
                       size="md"
+                      disabled={isLocked}
                       buttonClassName="rounded-xl py-3"
                     />
                  </div>
                  <div>
-                    <label className="block text-xs font-bold text-neutral-500 dark:text-orange-400/80 mb-1.5 uppercase tracking-wider">{t('date')}</label>
+                    <label className="block text-xs font-bold text-neutral-500 dark:text-orange-400/80 mb-1.5 uppercase tracking-wider">{t('expectedDeliveryDate') || 'Expected Delivery Date'}</label>
                     <input 
                       type="date" 
                       value={date}
                       onChange={e => setDate(e.target.value)}
+                      disabled={isLocked}
                       className="w-full px-4 py-3 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500 transition-all text-neutral-900 dark:text-white font-mono text-sm" 
                     />
                  </div>
@@ -369,14 +460,29 @@ const Purchasing: React.FC = () => {
                     <Dropdown
                       options={[
                         { value: 'Pending', label: t('pending') },
+                        { value: 'Approved', label: t('approved') || 'Approved' },
                         { value: 'Received', label: t('received') },
+                        { value: 'Cancelled', label: t('cancelled') },
                       ]}
                       value={status}
                       onChange={(val) => setStatus(val as any)}
                       size="md"
+                      disabled={Boolean(editingPoId)}
                       buttonClassName="rounded-xl py-3"
                     />
                  </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-xs font-bold text-neutral-500 dark:text-orange-400/80 mb-1.5 uppercase tracking-wider">{t('notes') || 'Notes'}</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  disabled={isLocked}
+                  rows={2}
+                  className="w-full px-4 py-3 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500 transition-all text-neutral-900 dark:text-white text-sm"
+                  placeholder={t('poNotesPlaceholder') || 'Notes for this purchase order'}
+                />
               </div>
 
               {/* Line Items */}
@@ -385,6 +491,7 @@ const Purchasing: React.FC = () => {
                     <h4 className="font-bold text-sm uppercase tracking-wide text-neutral-600 dark:text-neutral-300">{t('itemsSpecification')}</h4>
                     <button 
                       onClick={handleAddLineItem}
+                      disabled={isLocked}
                       className="text-xs text-orange-600 dark:text-orange-400 font-bold hover:underline flex items-center gap-1 uppercase tracking-wider"
                     >
                       <Plus className="w-3 h-3" /> {t('addItem')}
@@ -404,6 +511,7 @@ const Purchasing: React.FC = () => {
                               onChange={(val) => handleProductSelect(item.id, val)}
                               placeholder={t('selectProduct') || 'Select Product'}
                               size="sm"
+                              disabled={isLocked}
                               buttonClassName="rounded-lg"
                             />
                          </div>
@@ -414,6 +522,7 @@ const Purchasing: React.FC = () => {
                               min="1"
                               value={item.quantity}
                               onChange={e => updateLineItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
+                              disabled={isLocked}
                               className="w-full px-3 py-2 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500 text-sm font-mono text-center text-neutral-900 dark:text-white" 
                             />
                          </div>
@@ -426,13 +535,14 @@ const Purchasing: React.FC = () => {
                               step="0.01"
                               value={item.cost}
                               onChange={e => updateLineItem(item.id, 'cost', parseFloat(e.target.value) || 0)}
+                              disabled={isLocked}
                               className="w-full pl-6 pr-3 py-2 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500 text-sm font-mono text-neutral-900 dark:text-white" 
                             />
                          </div>
                          <button 
                            onClick={() => handleRemoveLineItem(item.id)}
                            className="p-2 text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                           disabled={lineItems.length === 1}
+                           disabled={lineItems.length === 1 || isLocked}
                          >
                            <Trash2 className="w-4 h-4" />
                          </button>
@@ -451,16 +561,20 @@ const Purchasing: React.FC = () => {
 
             <div className="p-5 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 flex justify-end gap-3">
                <button 
-                 onClick={() => setIsCreateModalOpen(false)}
+                 onClick={() => {
+                   setIsCreateModalOpen(false);
+                   resetForm();
+                 }}
                  className="px-5 py-2.5 text-neutral-600 dark:text-neutral-400 font-bold uppercase text-xs tracking-wider hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
                >
                  Cancel
                </button>
                <button 
-                 onClick={handleCreatePO}
-                 className="flex items-center gap-2 px-6 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg transition-all shadow-sm uppercase text-xs tracking-wider"
+                 onClick={handleSavePO}
+                 disabled={isLocked}
+                 className="flex items-center gap-2 px-6 py-2.5 bg-sky-600 hover:bg-sky-500 disabled:bg-neutral-400 text-white font-bold rounded-lg transition-all shadow-sm uppercase text-xs tracking-wider disabled:cursor-not-allowed"
                >
-                 <Save className="w-4 h-4" /> {t('saveOrder')}
+                 <Save className="w-4 h-4" /> {isLocked ? (t('poLocked') || 'Locked') : t('saveOrder')}
                </button>
             </div>
           </div>
@@ -488,7 +602,7 @@ const Purchasing: React.FC = () => {
                         </div>
                         <div>
                             <h3 className="font-bold text-lg text-neutral-800 dark:text-neutral-100">{t('printPreview')}</h3>
-                            <p className="text-sm text-neutral-500 dark:text-neutral-400 font-mono">{selectedPO.id}</p>
+                          <p className="text-sm text-neutral-500 dark:text-neutral-400 font-mono">{selectedPO.poNumber || selectedPO.id}</p>
                         </div>
                     </div>
                     <div className="flex gap-2">
@@ -512,7 +626,7 @@ const Purchasing: React.FC = () => {
                             </div>
                             <div className="text-right">
                                 <h2 className="text-xl font-bold text-gray-800 uppercase tracking-wide">Purchase Order</h2>
-                                <p className="text-gray-600 font-mono mt-1">#{selectedPO.id}</p>
+                              <p className="text-gray-600 font-mono mt-1">#{selectedPO.poNumber || selectedPO.id}</p>
                                 <div className={`inline-flex items-center px-2 py-0.5 mt-2 rounded-full text-xs font-bold border ${selectedPO.status === 'Received' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-orange-100 text-orange-700 border-orange-200'}`}>
                                     {selectedPO.status.toUpperCase()}
                                 </div>

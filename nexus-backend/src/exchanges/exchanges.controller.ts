@@ -42,13 +42,14 @@ export class ExchangesController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.exchangesService.findOne(id);
+  @Get(':id')
+  findOne(@Param('id') id: string, @Req() req: any) {
+    return this.exchangesService.findOne(id, req.user.branchId);
   }
 
   @Get('number/:exchangeNumber')
-  findByExchangeNumber(@Param('exchangeNumber') exchangeNumber: string) {
-    return this.exchangesService.findByExchangeNumber(exchangeNumber);
+  findByExchangeNumber(@Param('exchangeNumber') exchangeNumber: string, @Req() req: any) {
+    return this.exchangesService.findByExchangeNumber(exchangeNumber, req.user.branchId);
   }
 
   @Patch(':id/cancel')
@@ -57,7 +58,7 @@ export class ExchangesController {
     @Param('id') id: string,
     @Body('reason') reason: string,
   ) {
-    return this.exchangesService.cancel(id, reason || 'No reason provided', req.user.userId);
+    return this.exchangesService.cancel(id, reason || 'No reason provided', req.user.userId, req.user.branchId);
   }
 
   @Patch(':id/adjust')
@@ -67,7 +68,7 @@ export class ExchangesController {
     @Body('adjustedAmount') adjustedAmount: number,
     @Body('adjustmentReason') adjustmentReason: string,
   ) {
-    return this.exchangesService.adjustAmount(id, adjustedAmount, adjustmentReason, req.user.userId);
+    return this.exchangesService.adjustAmount(id, adjustedAmount, adjustmentReason, req.user.userId, req.user.branchId);
   }
 
   @Patch(':id/payment')
@@ -76,6 +77,6 @@ export class ExchangesController {
     @Param('id') id: string,
     @Body('paymentMethod') paymentMethod: 'CASH' | 'CARD' | 'CREDIT',
   ) {
-    return this.exchangesService.processPayment(id, paymentMethod, req.user.userId);
+    return this.exchangesService.processPayment(id, paymentMethod, req.user.userId, req.user.branchId);
   }
 }

@@ -5,7 +5,8 @@ export class CreateProductDto {
   name: string;
 
   @IsString()
-  sku: string;
+  @IsOptional()
+  sku?: string;
 
   @IsString()
   @IsOptional()
@@ -36,7 +37,12 @@ export class CreateProductDto {
   @IsOptional()
   categoryId?: string;
 
+  @IsString()
+  @IsOptional()
+  subcategoryId?: string;
+
   @IsNumber()
+  @Min(0)
   @IsOptional()
   stock?: number;
 

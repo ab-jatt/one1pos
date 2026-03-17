@@ -33,6 +33,7 @@ interface StockMovement {
   closingStock: number;
   reason: string | null;
   referenceId: string | null;
+  vendorName: string; // Added vendor information
 }
 
 interface ProductStock {
@@ -185,6 +186,7 @@ const StockReport: React.FC = () => {
 
   const getMovementTypeColor = (type: string) => {
     switch (type) {
+      case 'OPENING_STOCK': return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400';
       case 'SALE': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
       case 'RESTOCK': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
       case 'RETURN': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
@@ -461,6 +463,7 @@ const StockReport: React.FC = () => {
                   <tr className="text-xs font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider">
                     <th className="px-4 py-3 text-left">{t('date')}</th>
                     <th className="px-4 py-3 text-left">{t('product')}</th>
+                    <th className="px-4 py-3 text-left">{t('vendor')}</th>
                     <th className="px-4 py-3 text-left">{t('type')}</th>
                     <th className="px-4 py-3 text-right">{t('stockIn')}</th>
                     <th className="px-4 py-3 text-right">{t('stockOut')}</th>
@@ -480,6 +483,11 @@ const StockReport: React.FC = () => {
                           <p className="font-medium text-neutral-800 dark:text-white">{movement.productName}</p>
                           <p className="text-xs text-neutral-500 dark:text-neutral-400">{movement.productSku}</p>
                         </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 text-xs rounded-lg font-medium">
+                          {movement.vendorName}
+                        </span>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-block px-2 py-1 rounded text-xs font-bold ${getMovementTypeColor(movement.type)}`}>
@@ -505,7 +513,7 @@ const StockReport: React.FC = () => {
                   ))}
                   {movements.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
+                      <td colSpan={9} className="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
                         <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
                         <p>{t('noMovements')}</p>
                       </td>

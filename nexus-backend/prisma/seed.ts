@@ -62,6 +62,7 @@ async function main() {
   await prisma.customerLedger.deleteMany({});
   await prisma.customer.deleteMany({});
   await prisma.product.deleteMany({});
+  await prisma.subcategory.deleteMany({});
   await prisma.category.deleteMany({});
   await prisma.supplier.deleteMany({});
   await prisma.shift.deleteMany({});
@@ -167,6 +168,7 @@ async function main() {
           costPrice:   d.costPrice,
           categoryId:  d.categoryId,
           image:       d.image,
+          branchId:    branch.id,
         },
       })
     )
@@ -192,20 +194,20 @@ async function main() {
 
   // ─── 6. Customers ─────────────────────────────────────────────────────────
   const customers = await Promise.all([
-    prisma.customer.create({ data: { name: 'John Doe',      email: 'john@example.com',    phone: '+1-555-0101', points: 150,  balance: 0 } }),
-    prisma.customer.create({ data: { name: 'Jane Smith',    email: 'jane@example.com',    phone: '+1-555-0102', points: 200,  balance: 25.50 } }),
-    prisma.customer.create({ data: { name: 'Bob Wilson',    email: 'bob@example.com',     phone: '+1-555-0103', points: 75,   balance: 0 } }),
-    prisma.customer.create({ data: { name: 'Alice Johnson', email: 'alice@example.com',   phone: '+1-555-0104', points: 320,  balance: 50.00 } }),
-    prisma.customer.create({ data: { name: 'Charlie Brown', email: 'charlie@example.com', phone: '+1-555-0105', points: 45,   balance: 0 } }),
+    prisma.customer.create({ data: { name: 'John Doe',      email: 'john@example.com',    phone: '+1-555-0101', points: 150,  balance: 0, branchId: branch.id } }),
+    prisma.customer.create({ data: { name: 'Jane Smith',    email: 'jane@example.com',    phone: '+1-555-0102', points: 200,  balance: 25.50, branchId: branch.id } }),
+    prisma.customer.create({ data: { name: 'Bob Wilson',    email: 'bob@example.com',     phone: '+1-555-0103', points: 75,   balance: 0, branchId: branch.id } }),
+    prisma.customer.create({ data: { name: 'Alice Johnson', email: 'alice@example.com',   phone: '+1-555-0104', points: 320,  balance: 50.00, branchId: branch.id } }),
+    prisma.customer.create({ data: { name: 'Charlie Brown', email: 'charlie@example.com', phone: '+1-555-0105', points: 45,   balance: 0, branchId: branch.id } }),
   ]);
   console.log('✅ Customers created');
 
   // ─── 7. Suppliers ─────────────────────────────────────────────────────────
   const suppliers = await Promise.all([
-    prisma.supplier.create({ data: { name: 'Coffee Beans Co.',       contactPerson: 'Mike Johnson',  email: 'sales@coffeebeans.com',    phone: '+1-555-0200', paymentTerms: 'Net 30' } }),
-    prisma.supplier.create({ data: { name: 'Bakery Supplies Inc.',   contactPerson: 'Sarah Lee',     email: 'orders@bakerysupplies.com',phone: '+1-555-0201', paymentTerms: 'Net 15' } }),
-    prisma.supplier.create({ data: { name: 'Tech Gadgets Wholesale', contactPerson: 'David Chen',    email: 'wholesale@techgadgets.com',phone: '+1-555-0202', paymentTerms: 'Net 45' } }),
-    prisma.supplier.create({ data: { name: 'Fresh Dairy Farms',      contactPerson: 'Emma Wilson',   email: 'orders@freshdairy.com',    phone: '+1-555-0203', paymentTerms: 'Due on Receipt' } }),
+    prisma.supplier.create({ data: { name: 'Coffee Beans Co.',       contactPerson: 'Mike Johnson',  email: 'sales@coffeebeans.com',    phone: '+1-555-0200', paymentTerms: 'Net 30', branchId: branch.id } }),
+    prisma.supplier.create({ data: { name: 'Bakery Supplies Inc.',   contactPerson: 'Sarah Lee',     email: 'orders@bakerysupplies.com',phone: '+1-555-0201', paymentTerms: 'Net 15', branchId: branch.id } }),
+    prisma.supplier.create({ data: { name: 'Tech Gadgets Wholesale', contactPerson: 'David Chen',    email: 'wholesale@techgadgets.com',phone: '+1-555-0202', paymentTerms: 'Net 45', branchId: branch.id } }),
+    prisma.supplier.create({ data: { name: 'Fresh Dairy Farms',      contactPerson: 'Emma Wilson',   email: 'orders@freshdairy.com',    phone: '+1-555-0203', paymentTerms: 'Due on Receipt', branchId: branch.id } }),
   ]);
   console.log('✅ Suppliers created');
 
@@ -355,6 +357,7 @@ async function main() {
   await Promise.all([
     prisma.purchaseOrder.create({
       data: {
+        poNumber: `PO-${new Date().getFullYear()}-00001`,
         supplierId: suppliers[0].id, branchId: branch.id, status: 'RECEIVED', total: 430,
         items: { create: [
           { productId: products[0].id, quantity: 100, cost: 1.20 },
@@ -365,6 +368,7 @@ async function main() {
     }),
     prisma.purchaseOrder.create({
       data: {
+        poNumber: `PO-${new Date().getFullYear()}-00002`,
         supplierId: suppliers[1].id, branchId: branch.id, status: 'PENDING', total: 320,
         items: { create: [
           { productId: products[5].id, quantity: 150, cost: 1.00 },
@@ -375,6 +379,7 @@ async function main() {
     }),
     prisma.purchaseOrder.create({
       data: {
+        poNumber: `PO-${new Date().getFullYear()}-00003`,
         supplierId: suppliers[2].id, branchId: branch.id, status: 'PENDING', total: 825,
         items: { create: [
           { productId: products[11].id, quantity: 50, cost: 4.50 },
@@ -396,10 +401,10 @@ async function main() {
 
   // ─── 13. Settings ─────────────────────────────────────────────────────────
   await Promise.all([
-    prisma.setting.create({ data: { key: 'tax_rate',     value: '0.08' } }),
-    prisma.setting.create({ data: { key: 'currency',     value: 'USD' } }),
-    prisma.setting.create({ data: { key: 'app_name',     value: 'Nexus POS' } }),
-    prisma.setting.create({ data: { key: 'timezone',     value: 'America/New_York' } }),
+    prisma.setting.create({ data: { key: 'tax_rate',     value: '0.08', branchId: branch.id } }),
+    prisma.setting.create({ data: { key: 'currency',     value: 'USD', branchId: branch.id } }),
+    prisma.setting.create({ data: { key: 'app_name',     value: 'Nexus POS', branchId: branch.id } }),
+    prisma.setting.create({ data: { key: 'timezone',     value: 'America/New_York', branchId: branch.id } }),
   ]);
   console.log('✅ Settings created');
 

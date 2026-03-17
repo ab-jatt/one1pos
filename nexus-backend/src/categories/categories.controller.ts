@@ -22,8 +22,8 @@ export class CategoriesController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.categoriesService.findOne(id);
+  findOne(@Param('id') id: string, @Req() req: any) {
+    return this.categoriesService.findOne(id, req.user.branchId);
   }
 
   @Post()
@@ -35,12 +35,13 @@ export class CategoriesController {
   update(
     @Param('id') id: string,
     @Body() updateCategoryDto: UpdateCategoryDto,
+    @Req() req: any,
   ) {
-    return this.categoriesService.update(id, updateCategoryDto);
+    return this.categoriesService.update(id, updateCategoryDto, req.user.branchId);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.categoriesService.remove(id);
+  remove(@Param('id') id: string, @Req() req: any) {
+    return this.categoriesService.remove(id, req.user.branchId);
   }
 }

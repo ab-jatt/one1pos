@@ -24,7 +24,7 @@ export class OrdersService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, branchId?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
@@ -42,12 +42,16 @@ export class OrdersService {
       throw new NotFoundException(`Order with ID ${id} not found`);
     }
 
+    if (branchId && order.branchId !== branchId) {
+      throw new NotFoundException(`Order with ID ${id} not found`);
+    }
+
     return order;
   }
 
-  async findByOrderNumber(orderNumber: string) {
+  async findByOrderNumber(orderNumber: string, branchId: string) {
     const order = await this.prisma.order.findUnique({
-      where: { orderNumber },
+      where: { branchId_orderNumber: { branchId, orderNumber } },
       include: {
         items: {
           include: {
@@ -113,8 +117,12 @@ export class OrdersService {
     const discountAmount = discount || 0;
     const subtotalAfterDiscount = subtotal - discountAmount;
 
-    // Calculate tax (8%)
-    const taxRate = 0.08;
+    // Fetch store-scoped tax rate from Branch record
+    const branch = await this.prisma.branch.findUnique({
+      where: { id: branchId },
+      select: { taxRate: true },
+    });
+    const taxRate = branch ? Number(branch.taxRate) : 0;
     const tax = subtotalAfterDiscount * taxRate;
     const total = subtotalAfterDiscount + tax;
 
@@ -155,19 +163,6 @@ export class OrdersService {
 
       // Decrease stock for each item
       for (const item of orderItems) {
-        await tx.stock.updateMany({
-          where: {
-            branchId,
-            productId: item.productId,
-          },
-          data: {
-            quantity: {
-              decrement: item.quantity,
-            },
-          },
-        });
-
-        // Create stock movement
         const stock = await tx.stock.findFirst({
           where: {
             branchId,
@@ -176,19 +171,38 @@ export class OrdersService {
         });
 
         if (stock) {
-          const currentStock = stock.quantity;
-          await tx.stockMovement.create({
-            data: {
+          const openingStock = stock.quantity;
+          const closingStock = openingStock - item.quantity;
+
+          await tx.stock.update({
+            where: { id: stock.id },
+            data: { quantity: closingStock },
+          });
+
+          // Guard against duplicate movement rows for the same sale event and product.
+          const existingMovement = await tx.stockMovement.findFirst({
+            where: {
               stockId: stock.id,
               type: 'SALE',
-              quantityIn: 0,
-              quantityOut: item.quantity,
-              openingStock: currentStock,
-              closingStock: currentStock - item.quantity,
-              reason: `Order ${orderNumber}`,
               referenceId: newOrder.id,
             },
           });
+
+          if (!existingMovement) {
+            await tx.stockMovement.create({
+              data: {
+                stockId: stock.id,
+                type: 'SALE',
+                quantityIn: 0,
+                quantityOut: item.quantity,
+                openingStock,
+                closingStock,
+                reason: `Order ${orderNumber}`,
+                referenceId: newOrder.id,
+                createdById: cashierId,
+              },
+            });
+          }
         }
       }
 
@@ -262,8 +276,8 @@ export class OrdersService {
     return order;
   }
 
-  async refund(id: string, refundOrderDto: RefundOrderDto) {
-    const order = await this.findOne(id);
+  async refund(id: string, refundOrderDto: RefundOrderDto, branchId?: string) {
+    const order = await this.findOne(id, branchId);
 
     if (order.status === OrderStatus.REFUNDED) {
       throw new BadRequestException('Order has already been refunded');

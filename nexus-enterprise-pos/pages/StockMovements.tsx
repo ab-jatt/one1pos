@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowLeftRight, Plus, Search, X, ArrowDown, ArrowUp, Filter, RefreshCw } from 'lucide-react';
 import { Api } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 const movementTypeLabels: Record<string, string> = {
   PURCHASE_RECEIVE: 'Purchase Receive',
@@ -30,6 +31,7 @@ const isIncoming = (type: string) =>
   ['PURCHASE_RECEIVE', 'PRODUCTION_RECEIVE', 'ADJUSTMENT_IN', 'RETURN_IN', 'TRANSFER'].includes(type);
 
 const StockMovements: React.FC = () => {
+  const { showError, showWarning } = useToast();
   const [activeTab, setActiveTab] = useState<'movements' | 'balances'>('movements');
   const [movements, setMovements] = useState<any[]>([]);
   const [balances, setBalances] = useState<any[]>([]);
@@ -79,7 +81,7 @@ const StockMovements: React.FC = () => {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleAdjustment = async () => {
-    if (!adjustForm.warehouseId || !adjustForm.productId) return alert('Fill required fields');
+    if (!adjustForm.warehouseId || !adjustForm.productId) { showWarning('Fill required fields'); return; }
     try {
       await Api.warehouseMovements.createAdjustment({
         warehouseId: adjustForm.warehouseId,
@@ -93,7 +95,7 @@ const StockMovements: React.FC = () => {
       setAdjustForm({ warehouseId: '', productId: '', type: 'ADJUSTMENT_IN', quantity: 1, unitCost: 0, reason: '' });
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Adjustment failed');
+      showError(err.response?.data?.message || 'Adjustment failed');
     }
   };
 

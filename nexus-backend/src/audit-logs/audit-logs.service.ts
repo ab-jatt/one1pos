@@ -7,9 +7,7 @@ export class AuditLogsService {
 
   async findAll(branchId: string, limit = 100) {
     const logs = await this.prisma.auditLog.findMany({
-      where: {
-        user: { branchId },
-      },
+      where: { branchId },
       include: {
         user: true,
       },
@@ -27,10 +25,11 @@ export class AuditLogsService {
     }));
   }
 
-  async create(dto: any, userId: string) {
+  async create(dto: any, userId: string, branchId?: string) {
     const log = await this.prisma.auditLog.create({
       data: {
         userId,
+        branchId: branchId || null,
         action: dto.action,
         module: dto.module,
         details: dto.details,

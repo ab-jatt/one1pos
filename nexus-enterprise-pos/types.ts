@@ -16,7 +16,8 @@ export enum OrderStatus {
 export enum Role {
   OWNER = 'OWNER',
   MANAGER = 'MANAGER',
-  CASHIER = 'CASHIER'
+  CASHIER = 'CASHIER',
+  STAFF = 'STAFF'
 }
 
 export interface User {
@@ -35,6 +36,9 @@ export interface Product {
   price: number; // Sale Price
   costPrice: number; // Purchase Price (for P&L)
   category: string;
+  categoryId?: string;
+  subcategory?: string | null;
+  subcategoryId?: string | null;
   image: string;
   stock: number;
   sku: string;
@@ -109,10 +113,20 @@ export interface Employee {
 
 export interface PurchaseOrder {
   id: string;
+  poNumber?: string;
   supplier: string;
+  supplierId?: string;
   items: number;
   total: number;
-  status: 'Pending' | 'Received' | 'Cancelled';
+  notes?: string | null;
+  expectedDeliveryDate?: string;
+  lineItems?: Array<{
+    productId: string;
+    productName?: string;
+    quantity: number;
+    unitCost: number;
+  }>;
+  status: 'Pending' | 'Approved' | 'Received' | 'Cancelled';
   date: string;
 }
 

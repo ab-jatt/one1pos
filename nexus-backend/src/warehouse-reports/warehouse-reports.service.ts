@@ -6,6 +6,45 @@ export class WarehouseReportsService {
   constructor(private prisma: PrismaService) {}
 
   /**
+   * Get the most recent supplier for a product in a warehouse
+   * Used to show "primary vendor" in balance reports
+   */
+  private async getRecentSupplierForProduct(
+    branchId: string,
+    warehouseId: string,
+    productId: string,
+  ): Promise<string> {
+    try {
+      // Find the most recent PURCHASE movement for this product in this warehouse
+      const movement = await this.prisma.warehouseMovement.findFirst({
+        where: {
+          branchId,
+          toWarehouseId: warehouseId,
+          productId,
+          referenceType: 'PURCHASE',
+        },
+        include: {
+          // Purchase movement's referenceId points to PurchaseOrder
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (!movement || !movement.referenceId) {
+        return 'N/A';
+      }
+
+      const po = await this.prisma.purchaseOrder.findUnique({
+        where: { id: movement.referenceId },
+        include: { supplier: { select: { name: true } } },
+      });
+
+      return po?.supplier?.name || 'N/A';
+    } catch (error) {
+      return 'N/A';
+    }
+  }
+
+  /**
    * 1. Stock Balance Report — Product × Warehouse × Qty × Value
    */
   async getStockBalanceReport(filters: {
@@ -26,13 +65,19 @@ export class WarehouseReportsService {
     for (const warehouse of warehouses) {
       const incoming = await this.prisma.warehouseMovement.groupBy({
         by: ['productId'],
-        where: { toWarehouseId: warehouse.id },
+        where: {
+          branchId: warehouse.branchId,
+          toWarehouseId: warehouse.id,
+        },
         _sum: { quantity: true, totalCost: true },
       });
 
       const outgoing = await this.prisma.warehouseMovement.groupBy({
         by: ['productId'],
-        where: { fromWarehouseId: warehouse.id },
+        where: {
+          branchId: warehouse.branchId,
+          fromWarehouseId: warehouse.id,
+        },
         _sum: { quantity: true, totalCost: true },
       });
 
@@ -53,7 +98,10 @@ export class WarehouseReportsService {
       const productIds = Array.from(balanceMap.keys());
       if (productIds.length === 0) continue;
 
-      const productWhere: any = { id: { in: productIds } };
+      const productWhere: any = {
+        id: { in: productIds },
+        branchId: warehouse.branchId,
+      };
       if (filters.categoryId) productWhere.categoryId = filters.categoryId;
 
       const products = await this.prisma.product.findMany({
@@ -64,6 +112,14 @@ export class WarehouseReportsService {
       for (const product of products) {
         const balance = balanceMap.get(product.id);
         if (!balance || balance.qty === 0) continue;
+
+        // Get the most recent supplier for this product in this warehouse
+        const vendorName = await this.getRecentSupplierForProduct(
+          warehouse.branchId,
+          warehouse.id,
+          product.id,
+        );
+
         results.push({
           warehouseId: warehouse.id,
           warehouseName: warehouse.name,
@@ -75,6 +131,7 @@ export class WarehouseReportsService {
           quantity: balance.qty,
           unitCost: Number(product.costPrice),
           totalValue: balance.qty * Number(product.costPrice),
+          vendorName, // Added vendor information
         });
       }
     }
@@ -88,6 +145,38 @@ export class WarehouseReportsService {
       data: results,
       summary: { totalItems, totalQuantity, totalValue },
     };
+  }
+
+  /**
+   * Resolve vendor/supplier name for a warehouse movement
+   * For PURCHASE movements, follows referenceId → PurchaseOrder → Supplier
+   * For other movements, returns "N/A"
+   */
+  private async resolveVendorName(
+    referenceType: string | null,
+    referenceId: string | null,
+  ): Promise<string> {
+    if (!referenceId || !referenceType) return 'N/A';
+
+    // Only PURCHASE movements reference PurchaseOrders with suppliers
+    if (referenceType === 'PURCHASE') {
+      try {
+        const po = await this.prisma.purchaseOrder.findUnique({
+          where: { id: referenceId },
+          include: {
+            supplier: {
+              select: { name: true },
+            },
+          },
+        });
+        return po?.supplier?.name || 'N/A';
+      } catch (error) {
+        return 'N/A';
+      }
+    }
+
+    // Other reference types (PRODUCTION, SALE, TRANSFER, ADJUSTMENT) don't have suppliers
+    return 'N/A';
   }
 
   /**
@@ -129,26 +218,36 @@ export class WarehouseReportsService {
       take: 1000,
     });
 
-    const data = movements.map((m) => ({
-      id: m.id,
-      date: m.createdAt.toISOString(),
-      productName: m.product.name,
-      sku: m.product.sku,
-      fromWarehouse: m.fromWarehouse?.name || '-',
-      toWarehouse: m.toWarehouse?.name || '-',
-      quantity: m.quantity,
-      unitCost: Number(m.unitCost),
-      totalCost: Number(m.totalCost),
-      movementType: m.movementType,
-      referenceType: m.referenceType || '-',
-      referenceId: m.referenceId || '-',
-      notes: m.notes || '',
-      createdBy: m.createdBy?.name || '-',
-    }));
+    // Resolve vendor names for each movement
+    const dataWithVendors = await Promise.all(
+      movements.map(async (m) => {
+        const vendorName = await this.resolveVendorName(
+          m.referenceType,
+          m.referenceId,
+        );
+        return {
+          id: m.id,
+          date: m.createdAt.toISOString(),
+          productName: m.product.name,
+          sku: m.product.sku,
+          fromWarehouse: m.fromWarehouse?.name || '-',
+          toWarehouse: m.toWarehouse?.name || '-',
+          quantity: m.quantity,
+          unitCost: Number(m.unitCost),
+          totalCost: Number(m.totalCost),
+          movementType: m.movementType,
+          referenceType: m.referenceType || '-',
+          referenceId: m.referenceId || '-',
+          vendorName, // Added vendor information
+          notes: m.notes || '',
+          createdBy: m.createdBy?.name || '-',
+        };
+      }),
+    );
 
     // Summary by type
     const summaryByType: Record<string, { count: number; totalQty: number; totalValue: number }> = {};
-    for (const m of data) {
+    for (const m of dataWithVendors) {
       if (!summaryByType[m.movementType]) {
         summaryByType[m.movementType] = { count: 0, totalQty: 0, totalValue: 0 };
       }
@@ -157,7 +256,7 @@ export class WarehouseReportsService {
       summaryByType[m.movementType].totalValue += m.totalCost;
     }
 
-    return { data, summary: summaryByType, totalRecords: data.length };
+    return { data: dataWithVendors, summary: summaryByType, totalRecords: dataWithVendors.length };
   }
 
   /**

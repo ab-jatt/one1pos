@@ -44,7 +44,7 @@ export class WarehousesService {
     }));
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, branchId?: string) {
     const warehouse = await this.prisma.warehouse.findUnique({
       where: { id },
       include: {
@@ -54,6 +54,10 @@ export class WarehousesService {
     });
 
     if (!warehouse || warehouse.deletedAt) {
+      throw new NotFoundException(`Warehouse ${id} not found`);
+    }
+
+    if (branchId && warehouse.branchId !== branchId) {
       throw new NotFoundException(`Warehouse ${id} not found`);
     }
 
@@ -142,9 +146,12 @@ export class WarehousesService {
     };
   }
 
-  async update(id: string, dto: any) {
+  async update(id: string, dto: any, branchId?: string) {
     const warehouse = await this.prisma.warehouse.findUnique({ where: { id } });
     if (!warehouse || warehouse.deletedAt) {
+      throw new NotFoundException(`Warehouse ${id} not found`);
+    }
+    if (branchId && warehouse.branchId !== branchId) {
       throw new NotFoundException(`Warehouse ${id} not found`);
     }
 
@@ -184,9 +191,12 @@ export class WarehousesService {
     };
   }
 
-  async remove(id: string) {
+  async remove(id: string, branchId?: string) {
     const warehouse = await this.prisma.warehouse.findUnique({ where: { id } });
     if (!warehouse) throw new NotFoundException(`Warehouse ${id} not found`);
+    if (branchId && warehouse.branchId !== branchId) {
+      throw new NotFoundException(`Warehouse ${id} not found`);
+    }
 
     await this.prisma.warehouse.update({
       where: { id },
@@ -197,9 +207,12 @@ export class WarehousesService {
   }
 
   // Add location to warehouse
-  async addLocation(warehouseId: string, dto: any) {
+  async addLocation(warehouseId: string, dto: any, branchId?: string) {
     const warehouse = await this.prisma.warehouse.findUnique({ where: { id: warehouseId } });
     if (!warehouse) throw new NotFoundException(`Warehouse ${warehouseId} not found`);
+    if (branchId && warehouse.branchId !== branchId) {
+      throw new NotFoundException(`Warehouse ${warehouseId} not found`);
+    }
 
     const location = await this.prisma.warehouseLocation.create({
       data: {
@@ -213,9 +226,12 @@ export class WarehousesService {
   }
 
   // Get stock balances for a warehouse (calculated from movements)
-  async getStockBalances(warehouseId: string) {
+  async getStockBalances(warehouseId: string, branchId?: string) {
     const warehouse = await this.prisma.warehouse.findUnique({ where: { id: warehouseId } });
     if (!warehouse) throw new NotFoundException(`Warehouse ${warehouseId} not found`);
+    if (branchId && warehouse.branchId !== branchId) {
+      throw new NotFoundException(`Warehouse ${warehouseId} not found`);
+    }
 
     // Incoming movements (to this warehouse)
     const incoming = await this.prisma.warehouseMovement.groupBy({

@@ -5,6 +5,8 @@ import { Api, Category } from '../services/api';
 import { Product, CartItem, Customer, PaymentMethod, Order } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import SuccessModal from '../components/ui/SuccessModal';
 
 // ─── QZ Tray helpers ──────────────────────────────────────────────────────────
@@ -86,6 +88,8 @@ const WALK_IN_CUSTOMER: Customer = {
 const POS: React.FC = () => {
   const { t, language } = useLanguage();
   const { formatCurrency, currencySymbol } = useCurrency();
+  const { showSuccess, showError, showWarning } = useToast();
+  const { user } = useAuth();
   const formatMoney = (value: number) => formatCurrency(Number(value) || 0);
   const getPaymentMethodLabel = (method: PaymentMethod) => {
     switch (method) {
@@ -186,6 +190,9 @@ const POS: React.FC = () => {
     phone: localStorage.getItem('storePhone') || '(555) 123-4567',
   }));
 
+  // Store-scoped tax rate fetched from backend settings
+  const [taxRate, setTaxRate] = useState<number>(0);
+
   const receiptLocale = useMemo(() => {
     const localeMap = {
       en: 'en-US',
@@ -198,13 +205,23 @@ const POS: React.FC = () => {
 
   // Listen for storage changes to update template in real-time
   useEffect(() => {
-    const handleStorageChange = () => {
+    const handleStorageChange = async () => {
       setInvoiceTemplate(localStorage.getItem('invoiceTemplate') || 'thermal');
       setStoreProfile({
         name: localStorage.getItem('storeName') || 'one1pos Cafe - Downtown',
         address: localStorage.getItem('storeAddress') || '123 Business Street',
         phone: localStorage.getItem('storePhone') || '(555) 123-4567',
       });
+
+      // Always refresh tax rate from backend settings to avoid stale tax in POS.
+      try {
+        const settingsData = await Api.settings.get();
+        setTaxRate(settingsData.taxRate);
+      } catch {
+        // Fallback to local value if settings API is temporarily unavailable.
+        const localTaxRate = Number(localStorage.getItem('taxRate') || '0') / 100;
+        setTaxRate(Number.isFinite(localTaxRate) ? localTaxRate : 0);
+      }
     };
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
@@ -219,14 +236,16 @@ const POS: React.FC = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const [productsData, categoriesData, customersData] = await Promise.all([
+        const [productsData, categoriesData, customersData, settingsData] = await Promise.all([
           Api.products.getAll(),
           Api.categories.getAll(),
           Api.customers.getAll(),
+          Api.settings.get(),
         ]);
         setProducts(productsData);
         setCategories(['All', ...categoriesData.map((c: Category) => c.name)]);
         setCustomers([WALK_IN_CUSTOMER, ...customersData]);
+        setTaxRate(settingsData.taxRate);
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -273,7 +292,9 @@ const POS: React.FC = () => {
   const effectiveDiscount = Math.min(totalDiscountAmount, subtotal);
   const subtotalAfterDiscount = subtotal - effectiveDiscount;
   
-  const taxRate = 0.08;
+  // taxRate is store-scoped and fetched from the backend on mount;
+  // because it is a React state variable, all derived values below
+  // automatically recompute whenever taxRate, cart, or discounts change.
   const tax = subtotalAfterDiscount * taxRate;
   const total = subtotalAfterDiscount + tax;
 
@@ -454,7 +475,7 @@ const POS: React.FC = () => {
 
   const addToCart = (product: Product) => {
     if (product.stock <= 0) {
-      alert("This item is out of stock!");
+      showWarning('This item is out of stock!');
       return;
     }
 
@@ -462,7 +483,7 @@ const POS: React.FC = () => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
         if (existing.quantity >= product.stock) {
-          alert(`Cannot add more. Only ${product.stock} items in stock.`);
+          showWarning(`Cannot add more. Only ${product.stock} items in stock.`);
           return prev;
         }
         return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
@@ -485,7 +506,7 @@ const POS: React.FC = () => {
           const newQty = item.quantity + delta;
           
           if (newQty > product.stock) {
-             alert(`Cannot add more. Only ${product.stock} items in stock.`);
+             showWarning(`Cannot add more. Only ${product.stock} items in stock.`);
              return item;
           }
           
@@ -505,7 +526,7 @@ const POS: React.FC = () => {
         // We can't redeem more value than the subtotal minus existing discounts
         const remainingSubtotal = subtotal - baseDiscountAmount;
         if (remainingSubtotal <= 0) {
-            alert("Order total is too low to redeem points.");
+            showWarning('Order total is too low to redeem points.');
             return;
         }
 
@@ -514,7 +535,7 @@ const POS: React.FC = () => {
         const pointsToUse = Math.min(selectedCustomer.points, maxPoints);
 
         if (pointsToUse <= 0) {
-            alert("Insufficient points balance.");
+            showWarning('Insufficient points balance.');
             return;
         }
         setPointsRedeemed(pointsToUse);
@@ -531,7 +552,7 @@ const POS: React.FC = () => {
   const handleCheckout = async (method: PaymentMethod, amountPaid: number = total, changeAmount: number = 0) => {
     // Validate credit sales - only allow for registered customers
     if (method === PaymentMethod.CREDIT && selectedCustomer.id === 'walk-in') {
-      alert('Credit sales are only available for registered customers. Please select a customer.');
+      showWarning('Credit sales are only available for registered customers. Please select a customer.');
       return;
     }
     
@@ -545,7 +566,7 @@ const POS: React.FC = () => {
           quantity: item.quantity,
         })),
         customerId: selectedCustomer.id !== 'walk-in' ? selectedCustomer.id : undefined,
-        cashierId: 'cashier-user-id', // Default cashier from seed data
+        cashierId: user?.id || 'unknown',
         paymentMethod: method,
         discount: effectiveDiscount,
         pointsRedeemed: pointsRedeemed,
@@ -617,7 +638,7 @@ const POS: React.FC = () => {
       }
     } catch (error) {
       console.error('Error creating order:', error);
-      alert('Failed to process order. Please try again.');
+      showError('Failed to process order. Please try again.');
       setIsPaymentModalOpen(false);
     } finally {
       setIsProcessing(false);
@@ -630,7 +651,7 @@ const POS: React.FC = () => {
 
   const confirmPayment = async () => {
     if (cart.length === 0) {
-      alert('Cart is empty. Please add items before payment.');
+      showWarning('Cart is empty. Please add items before payment.');
       return;
     }
 
@@ -645,7 +666,7 @@ const POS: React.FC = () => {
     }
 
     if (validAmountGiven < total) {
-      alert('Amount given is less than total amount.');
+      showWarning('Amount given is less than total amount.');
       return;
     }
 
@@ -710,12 +731,12 @@ const POS: React.FC = () => {
         setExchangeIssuedItems([]); // Reset exchange items
       } else {
         setFoundOrder(null);
-        alert('Order not found');
+        showWarning('Order not found');
       }
     } catch (error) {
       console.error('Error searching order:', error);
       setFoundOrder(null);
-      alert('Order not found');
+      showError('Order not found');
     }
   };
 
@@ -798,12 +819,12 @@ const POS: React.FC = () => {
 
   const handleProcessRefund = async () => {
      if (selectedRefundItems.size === 0) {
-        alert("Select items for refund.");
+        showWarning('Select items for refund.');
         return;
      }
 
      if (!foundOrder) {
-        alert("No order selected for refund.");
+        showWarning('No order selected for refund.');
         return;
      }
 
@@ -845,7 +866,7 @@ const POS: React.FC = () => {
      } catch (error: any) {
        console.error('Refund error:', error);
        const errorMessage = error?.response?.data?.message || error?.message || 'Unknown error occurred';
-       alert(`Failed to process refund: ${errorMessage}`);
+       showError(`Failed to process refund: ${errorMessage}`);
      } finally {
        setIsProcessing(false);
      }
@@ -853,17 +874,17 @@ const POS: React.FC = () => {
 
   const handleProcessExchange = async () => {
     if (selectedRefundItems.size === 0) {
-      alert("Select items to return for exchange.");
+      showWarning('Select items to return for exchange.');
       return;
     }
 
     if (exchangeIssuedItems.length === 0) {
-      alert("Add items to issue in exchange.");
+      showWarning('Add items to issue in exchange.');
       return;
     }
 
     if (!foundOrder) {
-      alert("No order selected for exchange.");
+      showWarning('No order selected for exchange.');
       return;
     }
 
@@ -926,7 +947,7 @@ const POS: React.FC = () => {
     } catch (error: any) {
       console.error('Exchange error:', error);
       const errorMessage = error?.response?.data?.message || error?.message || 'Unknown error occurred';
-      alert(`Failed to process exchange: ${errorMessage}`);
+      showError(`Failed to process exchange: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
     }

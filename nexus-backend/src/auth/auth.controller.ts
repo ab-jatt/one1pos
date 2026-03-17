@@ -19,6 +19,12 @@ class GoogleLoginDto {
   idToken: string;
 }
 
+class FirebaseLoginDto {
+  @IsString()
+  @IsNotEmpty()
+  idToken: string;
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -33,6 +39,12 @@ export class AuthController {
   @Post('google')
   async googleLogin(@Body() dto: GoogleLoginDto) {
     return this.authService.loginWithGoogle(dto.idToken);
+  }
+
+  @Public()
+  @Post('firebase')
+  async firebaseLogin(@Body() dto: FirebaseLoginDto) {
+    return this.authService.loginWithFirebase(dto.idToken);
   }
 
   @Get('me')

@@ -26,13 +26,13 @@ export class OrdersController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.ordersService.findOne(id);
+  findOne(@Param('id') id: string, @Req() req: any) {
+    return this.ordersService.findOne(id, req.user.branchId);
   }
 
   @Get('number/:orderNumber')
-  findByOrderNumber(@Param('orderNumber') orderNumber: string) {
-    return this.ordersService.findByOrderNumber(orderNumber);
+  findByOrderNumber(@Param('orderNumber') orderNumber: string, @Req() req: any) {
+    return this.ordersService.findByOrderNumber(orderNumber, req.user.branchId);
   }
 
   @Post()
@@ -41,7 +41,7 @@ export class OrdersController {
   }
 
   @Post(':id/refund')
-  refund(@Param('id') id: string, @Body() refundOrderDto: RefundOrderDto) {
-    return this.ordersService.refund(id, refundOrderDto);
+  refund(@Param('id') id: string, @Body() refundOrderDto: RefundOrderDto, @Req() req: any) {
+    return this.ordersService.refund(id, refundOrderDto, req.user.branchId);
   }
 }

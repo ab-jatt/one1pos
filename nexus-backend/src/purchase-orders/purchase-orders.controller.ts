@@ -11,8 +11,8 @@ export class PurchaseOrdersController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.purchaseOrdersService.findOne(id);
+  findOne(@Param('id') id: string, @Req() req: any) {
+    return this.purchaseOrdersService.findOne(id, req.user.branchId);
   }
 
   @Post()
@@ -20,8 +20,13 @@ export class PurchaseOrdersController {
     return this.purchaseOrdersService.create(dto, req.user.branchId);
   }
 
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
+    return this.purchaseOrdersService.update(id, dto, req.user.branchId);
+  }
+
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body('status') status: string) {
-    return this.purchaseOrdersService.updateStatus(id, status);
+  updateStatus(@Param('id') id: string, @Body('status') status: string, @Req() req: any) {
+    return this.purchaseOrdersService.updateStatus(id, status, req.user.branchId);
   }
 }

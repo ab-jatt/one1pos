@@ -4,6 +4,7 @@ import { Card } from '../components/ui/Card';
 import { Api } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { useToast } from '../context/ToastContext';
 import { Search, Plus, Mail, Phone, Star, Filter, X, Save, User, Users, Trophy, TrendingUp, Zap, Gift, Calculator, Wallet, ArrowUpRight, ArrowDownRight, Loader2, FileText, Calendar } from 'lucide-react';
 import Dropdown from '../components/ui/Dropdown';
 import { Customer } from '../types';
@@ -21,6 +22,7 @@ interface LedgerEntry {
 const Customers: React.FC = () => {
   const { t = (key: string) => key } = useLanguage() || {};
   const { formatMoney = (val: number) => `$${val.toFixed(2)}` } = useCurrency() || {};
+  const { showSuccess, showError, showWarning } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -105,7 +107,7 @@ const Customers: React.FC = () => {
 
   const handleAddCustomer = async () => {
     if (!newCustomer.name) {
-      alert('Name is required');
+      showWarning('Name is required');
       return;
     }
 
@@ -120,7 +122,7 @@ const Customers: React.FC = () => {
       setNewCustomer({ name: '', email: '', phone: '' });
     } catch (error) {
       console.error('Error creating customer:', error);
-      alert('Failed to create customer');
+      showError('Failed to create customer');
     }
   };
 
@@ -153,7 +155,7 @@ const Customers: React.FC = () => {
       setLedgerData(data);
     } catch (error) {
       console.error('Error fetching ledger:', error);
-      alert('Failed to fetch credit activity');
+      showError('Failed to fetch credit activity');
     } finally {
       setLedgerLoading(false);
     }
@@ -194,7 +196,7 @@ const Customers: React.FC = () => {
         setSelectedCustomer(null);
       } catch (error) {
         console.error('Error adjusting points:', error);
-        alert('Failed to adjust points');
+        showError('Failed to adjust points');
       }
   };
 
@@ -218,7 +220,7 @@ const Customers: React.FC = () => {
         setSelectedCustomer(null);
       } catch (error) {
         console.error('Error adjusting balance:', error);
-        alert('Failed to adjust balance');
+        showError('Failed to adjust balance');
       }
   };
 

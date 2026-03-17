@@ -32,13 +32,24 @@ model Branch {
   stockTransfers   StockTransfer[]
   productionOrders ProductionOrder[]
   categories       Category[]
+  subcategories    Subcategory[]
+  products         Product[]
+  customers        Customer[]
+  suppliers        Supplier[]
+  settings         Setting[]
+  auditLogs        AuditLog[]
+  payrollRecords   PayrollRecord[]
 }
 
 model Setting {
   id        String   @id @default(uuid())
-  key       String   @unique
+  key       String
   value     String
+  branchId  String
   updatedAt DateTime @updatedAt
+  branch    Branch   @relation(fields: [branchId], references: [id])
+
+  @@unique([branchId, key])
 }
 
 model Plan {
@@ -66,12 +77,17 @@ model Subscription {
 model User {
   id                   String          @id @default(uuid())
   email                String          @unique
+  firebaseUid          String?         @unique
   password             String
   name                 String
+  firstName            String?
+  lastName             String?
   role                 Role            @default(CASHIER)
   permissions          String[]
   avatar               String?
   branchId             String
+  isActive             Boolean         @default(true)
+  createdById          String?
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
   deletedAt            DateTime?
@@ -118,6 +134,7 @@ model Shift {
 
 model PayrollRecord {
   id          String        @id @default(uuid())
+  branchId    String
   periodStart DateTime
   periodEnd   DateTime
   payDate     DateTime
@@ -125,6 +142,7 @@ model PayrollRecord {
   status      String
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+  branch      Branch        @relation(fields: [branchId], references: [id])
   items       PayrollItem[]
 }
 
@@ -146,9 +164,11 @@ model Customer {
   phone     String?
   points    Int              @default(0)
   balance   Decimal          @default(0) @db.Decimal(10, 2)
+  branchId  String
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
   deletedAt DateTime?
+  branch    Branch           @relation(fields: [branchId], references: [id])
   ledger    CustomerLedger[]
   orders    Order[]
   exchanges Exchange[]
@@ -169,33 +189,52 @@ model CustomerLedger {
 }
 
 model Category {
-  id        String    @id @default(uuid())
-  name      String
-  branchId  String
-  branch    Branch    @relation(fields: [branchId], references: [id])
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  products  Product[]
+  id            String        @id @default(uuid())
+  name          String
+  branchId      String
+  branch        Branch        @relation(fields: [branchId], references: [id])
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  products      Product[]
+  subcategories Subcategory[]
 
   @@unique([branchId, name])
+}
+
+model Subcategory {
+  id         String    @id @default(uuid())
+  name       String
+  categoryId String
+  branchId   String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  category   Category  @relation(fields: [categoryId], references: [id])
+  branch     Branch    @relation(fields: [branchId], references: [id])
+  products   Product[]
+
+  @@unique([branchId, categoryId, name])
 }
 
 model Product {
   id                   String              @id @default(uuid())
   name                 String
-  sku                  String              @unique
-  productCode          String              @unique
-  barcode              String?             @unique
+  sku                  String
+  productCode          String
+  barcode              String?
   description          String?
   image                String?
   price                Decimal             @db.Decimal(10, 2)
   costPrice            Decimal             @db.Decimal(10, 2)
   categoryId           String
+  subcategoryId        String?
+  branchId             String
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
   deletedAt            DateTime?
   orderItems           OrderItem[]
+  branch               Branch              @relation(fields: [branchId], references: [id])
   category             Category            @relation(fields: [categoryId], references: [id])
+  subcategory          Subcategory?        @relation(fields: [subcategoryId], references: [id])
   poItems              PurchaseOrderItem[]
   stocks               Stock[]
   exchangeReturnItems  ExchangeReturnItem[]
@@ -204,6 +243,10 @@ model Product {
   stockTransferItems   StockTransferItem[]
   productionOrders     ProductionOrder[]
   productionOrderItems ProductionOrderItem[]
+
+  @@unique([branchId, sku])
+  @@unique([branchId, productCode])
+  @@unique([branchId, barcode])
 }
 
 model Stock {
@@ -245,14 +288,17 @@ model Supplier {
   phone          String?
   address        String?
   paymentTerms   String?
+  branchId       String
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   deletedAt      DateTime?
+  branch         Branch          @relation(fields: [branchId], references: [id])
   purchaseOrders PurchaseOrder[]
 }
 
 model PurchaseOrder {
   id         String              @id @default(uuid())
+  poNumber   String
   supplierId String
   branchId   String
   status     PurchaseOrderStatus @default(PENDING)
@@ -264,6 +310,8 @@ model PurchaseOrder {
   branch     Branch              @relation(fields: [branchId], references: [id])
   supplier   Supplier            @relation(fields: [supplierId], references: [id])
   items      PurchaseOrderItem[]
+
+  @@unique([branchId, poNumber])
 }
 
 model PurchaseOrderItem {
@@ -278,7 +326,7 @@ model PurchaseOrderItem {
 
 model Order {
   id          String       @id @default(uuid())
-  orderNumber String       @unique
+  orderNumber String
   customerId  String?
   cashierId   String
   branchId    String
@@ -296,6 +344,8 @@ model Order {
   payments    Payment[]
   transaction Transaction?
   exchanges   Exchange[]
+
+  @@unique([branchId, orderNumber])
 }
 
 model OrderItem {
@@ -337,18 +387,21 @@ model Transaction {
 model AuditLog {
   id        String   @id @default(uuid())
   userId    String?
+  branchId  String?
   action    String
   module    String
   details   String?
   ipAddress String?
   timestamp DateTime @default(now())
   user      User?    @relation(fields: [userId], references: [id])
+  branch    Branch?  @relation(fields: [branchId], references: [id])
 }
 
 enum Role {
   OWNER
   MANAGER
   CASHIER
+  STAFF
 }
 
 enum OrderStatus {
@@ -368,11 +421,13 @@ enum PaymentMethod {
 
 enum PurchaseOrderStatus {
   PENDING
+  APPROVED
   RECEIVED
   CANCELLED
 }
 
 enum MovementType {
+  OPENING_STOCK
   SALE
   RESTOCK
   ADJUSTMENT
@@ -398,7 +453,7 @@ enum EmployeeStatus {
 // Exchange System Models
 model Exchange {
   id                  String         @id @default(uuid())
-  exchangeNumber      String         @unique
+  exchangeNumber      String
   originalOrderId     String
   customerId          String?
   branchId            String
@@ -424,6 +479,8 @@ model Exchange {
   returnedItems       ExchangeReturnItem[]
   issuedItems         ExchangeIssuedItem[]
   ledgerEntries       CustomerLedger[] @relation("ExchangeLedgerEntries")
+
+  @@unique([branchId, exchangeNumber])
 }
 
 model ExchangeReturnItem {
@@ -526,7 +583,7 @@ model WarehouseMovement {
 model StockTransfer {
   id              String              @id @default(uuid())
   branchId        String
-  transferNumber  String              @unique
+  transferNumber  String
   fromWarehouseId String
   toWarehouseId   String
   status          StockTransferStatus @default(DRAFT)
@@ -542,6 +599,8 @@ model StockTransfer {
   createdBy       User?               @relation("TransferCreator", fields: [createdById], references: [id])
   approvedBy      User?               @relation("TransferApprover", fields: [approvedById], references: [id])
   items           StockTransferItem[]
+
+  @@unique([branchId, transferNumber])
 }
 
 model StockTransferItem {
@@ -557,7 +616,7 @@ model StockTransferItem {
 model ProductionOrder {
   id              String                @id @default(uuid())
   branchId        String
-  orderNumber     String                @unique
+  orderNumber     String
   productId       String                // Finished goods product
   quantity        Int                   // Quantity to produce
   completedQty    Int                   @default(0)
@@ -574,6 +633,8 @@ model ProductionOrder {
   product         Product               @relation(fields: [productId], references: [id])
   createdBy       User?                 @relation("ProductionOrderCreator", fields: [createdById], references: [id])
   items           ProductionOrderItem[]
+
+  @@unique([branchId, orderNumber])
 }
 
 model ProductionOrderItem {

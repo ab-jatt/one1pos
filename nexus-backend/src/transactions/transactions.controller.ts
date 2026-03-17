@@ -16,8 +16,8 @@ export class TransactionsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.transactionsService.findOne(id);
+  findOne(@Param('id') id: string, @Req() req: any) {
+    return this.transactionsService.findOne(id, req.user.branchId);
   }
 
   @Post()

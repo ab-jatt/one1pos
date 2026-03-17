@@ -10,12 +10,13 @@ export class ExchangesService {
   /**
    * Generate unique exchange number
    */
-  private async generateExchangeNumber(): Promise<string> {
+  private async generateExchangeNumber(branchId: string): Promise<string> {
     const today = new Date();
     const datePrefix = today.toISOString().slice(0, 10).replace(/-/g, '');
     
     const lastExchange = await this.prisma.exchange.findFirst({
       where: {
+        branchId,
         exchangeNumber: {
           startsWith: `EX-${datePrefix}`,
         },
@@ -59,13 +60,13 @@ export class ExchangesService {
       notes,
     } = createExchangeDto;
 
-    // VALIDATION: Original order must exist
+    // VALIDATION: Original order must exist and belong to the same branch
     const originalOrder = await this.prisma.order.findUnique({
       where: { id: originalOrderId },
       include: { items: true },
     });
 
-    if (!originalOrder) {
+    if (!originalOrder || originalOrder.branchId !== branchId) {
       throw new NotFoundException('Original order not found. Exchange requires a valid invoice reference.');
     }
 
@@ -111,7 +112,7 @@ export class ExchangesService {
     }
 
     // Generate exchange number
-    const exchangeNumber = await this.generateExchangeNumber();
+    const exchangeNumber = await this.generateExchangeNumber(branchId);
 
     // Determine payment status
     let paymentStatus: 'PENDING' | 'PAID' | 'REFUNDED' | 'CREDIT_ISSUED' | 'CREDIT_USED' | 'NOT_APPLICABLE' = 'PENDING';
@@ -418,7 +419,7 @@ export class ExchangesService {
    * Find all exchanges with pagination
    */
   async findAll(params: {
-    branchId?: string;
+    branchId: string;
     customerId?: string;
     startDate?: string;
     endDate?: string;
@@ -428,8 +429,7 @@ export class ExchangesService {
   }) {
     const { branchId, customerId, startDate, endDate, page = 1, limit = 20, status } = params;
 
-    const where: any = {};
-    if (branchId) where.branchId = branchId;
+    const where: any = { branchId };
     if (customerId) where.customerId = customerId;
     if (status) where.status = status;
     if (startDate || endDate) {
@@ -474,7 +474,7 @@ export class ExchangesService {
   /**
    * Find a single exchange by ID
    */
-  async findOne(id: string) {
+  async findOne(id: string, branchId?: string) {
     const exchange = await this.prisma.exchange.findUnique({
       where: { id },
       include: {
@@ -497,6 +497,10 @@ export class ExchangesService {
       throw new NotFoundException('Exchange not found');
     }
 
+    if (branchId && exchange.branchId !== branchId) {
+      throw new NotFoundException('Exchange not found');
+    }
+
     // Add computed fields for clarity
     return {
       ...exchange,
@@ -510,9 +514,9 @@ export class ExchangesService {
   /**
    * Find exchange by exchange number
    */
-  async findByExchangeNumber(exchangeNumber: string) {
-    const exchange = await this.prisma.exchange.findUnique({
-      where: { exchangeNumber },
+  async findByExchangeNumber(exchangeNumber: string, branchId: string) {
+    const exchange = await this.prisma.exchange.findFirst({
+      where: { exchangeNumber, branchId },
       include: {
         customer: true,
         originalOrder: {
@@ -546,12 +550,12 @@ export class ExchangesService {
    * Cancel an exchange (rollback stock movements)
    * This reverses all inventory changes but preserves the record for audit
    */
-  async cancel(id: string, reason: string, cancelledById?: string) {
+  async cancel(id: string, reason: string, cancelledById?: string, branchId?: string) {
     if (!reason || reason.trim().length === 0) {
       throw new BadRequestException('Cancellation reason is required');
     }
 
-    const exchange = await this.findOne(id);
+    const exchange = await this.findOne(id, branchId);
 
     if (exchange.status === 'CANCELLED') {
       throw new BadRequestException('Exchange is already cancelled');
@@ -717,13 +721,14 @@ export class ExchangesService {
     id: string, 
     adjustedAmount: number, 
     adjustmentReason: string, 
-    adjustedById: string
+    adjustedById: string,
+    branchId?: string,
   ) {
     if (!adjustmentReason || adjustmentReason.trim().length === 0) {
       throw new BadRequestException('Adjustment reason is mandatory');
     }
 
-    const exchange = await this.findOne(id);
+    const exchange = await this.findOne(id, branchId);
 
     if (exchange.status === 'CANCELLED') {
       throw new BadRequestException('Cannot adjust a cancelled exchange');
@@ -790,8 +795,8 @@ export class ExchangesService {
   /**
    * Process payment for a pending exchange
    */
-  async processPayment(id: string, paymentMethod: 'CASH' | 'CARD' | 'CREDIT', processedById?: string) {
-    const exchange = await this.findOne(id);
+  async processPayment(id: string, paymentMethod: 'CASH' | 'CARD' | 'CREDIT', processedById?: string, branchId?: string) {
+    const exchange = await this.findOne(id, branchId);
 
     if (exchange.status === 'CANCELLED') {
       throw new BadRequestException('Cannot process payment for a cancelled exchange');

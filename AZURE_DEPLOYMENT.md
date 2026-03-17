@@ -250,6 +250,15 @@ az containerapp exec `
 # Backend health check
 Invoke-RestMethod "https://$BACKEND_URL/api/health"
 
+# Verify store-scoped settings endpoint is live (requires auth token)
+# 1) Sign in from frontend, copy token from localStorage key: nexus_auth_token
+# 2) Set it here:
+$TOKEN = "<paste-jwt-token-here>"
+
+Invoke-RestMethod `
+  -Uri "https://$BACKEND_URL/api/settings" `
+  -Headers @{ Authorization = "Bearer $TOKEN" }
+
 # Dashboard data
 Invoke-RestMethod "https://$BACKEND_URL/api/dashboard/top-products"
 
@@ -271,7 +280,44 @@ az containerapp update --name $BACKEND --resource-group $RG --image "${ACR_SERVE
 docker build --build-arg VITE_API_URL="https://${BACKEND_URL}/api" -t "${ACR_SERVER}/nexuspos-frontend:latest" ./nexus-enterprise-pos
 docker push "${ACR_SERVER}/nexuspos-frontend:latest"
 az containerapp update --name $FRONTEND --resource-group $RG --image "${ACR_SERVER}/nexuspos-frontend:latest"
+
+# Wait for latest backend revision to become healthy
+az containerapp revision list --name $BACKEND --resource-group $RG -o table
+
+# Quick tax consistency check (store-scoped)
+# Set this after copying a valid JWT for a user in the target store:
+$TOKEN = "<paste-jwt-token-here>"
+
+# Read current tax rate from backend settings
+Invoke-RestMethod `
+  -Uri "https://$BACKEND_URL/api/settings" `
+  -Headers @{ Authorization = "Bearer $TOKEN" }
+
+# Example: set tax rate to 0% for the authenticated store
+Invoke-RestMethod `
+  -Method Patch `
+  -Uri "https://$BACKEND_URL/api/settings" `
+  -Headers @{ Authorization = "Bearer $TOKEN" } `
+  -ContentType "application/json" `
+  -Body '{"taxRate":0}'
+
+# Example: set tax rate to 5% for the authenticated store
+Invoke-RestMethod `
+  -Method Patch `
+  -Uri "https://$BACKEND_URL/api/settings" `
+  -Headers @{ Authorization = "Bearer $TOKEN" } `
+  -ContentType "application/json" `
+  -Body '{"taxRate":0.05}'
 ```
+
+### POS Tax Verification In Azure
+
+1. Open frontend at https://$FRONTEND_URL and sign in to Store A.
+2. Update tax rate to 0 in Settings and save.
+3. Open POS and confirm Tax shows 0 and Total equals taxable subtotal.
+4. Update tax rate to 5 in Settings and save.
+5. In POS, change quantity or discount and confirm tax recomputes with 5%.
+6. Sign in to Store B and confirm POS uses Store B tax rate only.
 
 ---
 

@@ -6,8 +6,9 @@ import { CreateSupplierDto, UpdateSupplierDto } from './dto';
 export class SuppliersService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll() {
+  async findAll(branchId: string) {
     const suppliers = await this.prisma.supplier.findMany({
+      where: { branchId },
       include: {
         _count: {
           select: { purchaseOrders: true },
@@ -28,7 +29,7 @@ export class SuppliersService {
     }));
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, branchId?: string) {
     const supplier = await this.prisma.supplier.findUnique({
       where: { id },
       include: {
@@ -43,10 +44,14 @@ export class SuppliersService {
       throw new NotFoundException(`Supplier with ID ${id} not found`);
     }
 
+    if (branchId && supplier.branchId !== branchId) {
+      throw new NotFoundException(`Supplier with ID ${id} not found`);
+    }
+
     return supplier;
   }
 
-  async create(dto: CreateSupplierDto) {
+  async create(dto: CreateSupplierDto, branchId: string) {
     return this.prisma.supplier.create({
       data: {
         name: dto.name,
@@ -55,18 +60,13 @@ export class SuppliersService {
         phone: dto.phone,
         address: dto.address,
         paymentTerms: dto.paymentTerms || 'Net 30',
+        branchId,
       },
     });
   }
 
-  async update(id: string, dto: UpdateSupplierDto) {
-    const supplier = await this.prisma.supplier.findUnique({
-      where: { id },
-    });
-
-    if (!supplier) {
-      throw new NotFoundException(`Supplier with ID ${id} not found`);
-    }
+  async update(id: string, dto: UpdateSupplierDto, branchId: string) {
+    await this.findOne(id, branchId);
 
     return this.prisma.supplier.update({
       where: { id },
@@ -74,14 +74,8 @@ export class SuppliersService {
     });
   }
 
-  async remove(id: string) {
-    const supplier = await this.prisma.supplier.findUnique({
-      where: { id },
-    });
-
-    if (!supplier) {
-      throw new NotFoundException(`Supplier with ID ${id} not found`);
-    }
+  async remove(id: string, branchId: string) {
+    await this.findOne(id, branchId);
 
     await this.prisma.supplier.delete({
       where: { id },

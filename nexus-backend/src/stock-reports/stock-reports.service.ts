@@ -87,16 +87,24 @@ export class StockReportsService {
           orderBy: { createdAt: 'asc' },
         });
 
-        // Calculate totals
+        // Calculate totals. Opening stock events are tracked separately from regular stock-in.
         let totalIn = 0;
         let totalOut = 0;
         let runningBalance = openingStock;
+        let reportOpeningStock = openingStock;
 
         const ledgerEntries = movements.map((movement) => {
           const prevBalance = runningBalance;
-          runningBalance = runningBalance + movement.quantityIn - movement.quantityOut;
-          totalIn += movement.quantityIn;
-          totalOut += movement.quantityOut;
+          const delta = movement.quantityIn - movement.quantityOut;
+
+          if ((movement.type as unknown as string) === 'OPENING_STOCK') {
+            reportOpeningStock += delta;
+          } else {
+            totalIn += movement.quantityIn;
+            totalOut += movement.quantityOut;
+          }
+
+          runningBalance = runningBalance + delta;
 
           return {
             id: movement.id,
@@ -117,7 +125,7 @@ export class StockReportsService {
           productSku: stock.product.sku,
           category: stock.product.category?.name || 'Uncategorized',
           currentStock: stock.quantity,
-          openingStock,
+          openingStock: reportOpeningStock,
           closingStock: runningBalance,
           totalIn,
           totalOut,
@@ -144,6 +152,39 @@ export class StockReportsService {
       summary,
       products: reportData,
     };
+  }
+
+  /**
+   * Resolve vendor/supplier name for a stock movement
+   * For RESTOCK movements, follows referenceId → PurchaseOrder → Supplier
+   * For other movements, returns "N/A"
+   */
+  private async resolveVendorName(
+    branchId: string,
+    type: string,
+    referenceId: string | null,
+  ): Promise<string> {
+    if (!referenceId) return 'N/A';
+
+    // Only RESTOCK movements reference PurchaseOrders
+    if (type === 'RESTOCK') {
+      try {
+        const po = await this.prisma.purchaseOrder.findUnique({
+          where: { id: referenceId },
+          include: {
+            supplier: {
+              select: { name: true },
+            },
+          },
+        });
+        return po?.supplier?.name || 'N/A';
+      } catch (error) {
+        return 'N/A';
+      }
+    }
+
+    // Other movement types (SALE, ADJUSTMENT, RETURN, DAMAGE, etc) don't have associated vendors
+    return 'N/A';
   }
 
   /**
@@ -217,6 +258,32 @@ export class StockReportsService {
       take: limit,
     });
 
+    // Resolve vendor names for each movement
+    const movementsWithVendors = await Promise.all(
+      movements.map(async (m) => {
+        const vendorName = await this.resolveVendorName(
+          branchId,
+          m.type as unknown as string,
+          m.referenceId,
+        );
+        return {
+          id: m.id,
+          date: m.createdAt,
+          productId: m.stock.product.id,
+          productName: m.stock.product.name,
+          productSku: m.stock.product.sku,
+          type: m.type,
+          quantityIn: m.quantityIn,
+          quantityOut: m.quantityOut,
+          openingStock: m.openingStock,
+          closingStock: m.closingStock,
+          reason: m.reason,
+          referenceId: m.referenceId,
+          vendorName, // Added vendor information
+        };
+      }),
+    );
+
     return {
       dateRange: {
         startDate: start.toISOString().split('T')[0],
@@ -228,20 +295,7 @@ export class StockReportsService {
         totalCount,
         totalPages: Math.ceil(totalCount / limit),
       },
-      movements: movements.map((m) => ({
-        id: m.id,
-        date: m.createdAt,
-        productId: m.stock.product.id,
-        productName: m.stock.product.name,
-        productSku: m.stock.product.sku,
-        type: m.type,
-        quantityIn: m.quantityIn,
-        quantityOut: m.quantityOut,
-        openingStock: m.openingStock,
-        closingStock: m.closingStock,
-        reason: m.reason,
-        referenceId: m.referenceId,
-      })),
+      movements: movementsWithVendors,
     };
   }
 

@@ -5,6 +5,7 @@ import { OrderStatus } from '../types';
 import { BarChart, Bar, PieChart, Pie, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, AreaChart, Area } from 'recharts';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { useToast } from '../context/ToastContext';
 import { Download, TrendingUp, DollarSign, PieChart as PieChartIcon, Activity, Printer, FileText, Eye, Search, X, PlusCircle, RefreshCw, BarChart3, Binary } from 'lucide-react';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#22c55e'];
@@ -56,6 +57,7 @@ const CUSTOMER_TRAFFIC = [
 const Reports: React.FC = () => {
   const { t = (key: string) => key } = useLanguage() || {};
   const { formatMoney = (val: number) => `$${val.toFixed(2)}`, currencySymbol = '$' } = useCurrency() || {};
+  const { showSuccess } = useToast();
   
   const [activeTab, setActiveTab] = useState<'analytics' | 'documents'>('analytics');
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
@@ -158,7 +160,7 @@ const Reports: React.FC = () => {
     setReports(prev => [newReport, ...prev]);
     setIsGenerating(false);
     setActiveTab('documents'); // Switch to documents tab to see new report
-    alert(t('dailyClosingReportGenerated'));
+    showSuccess(t('dailyClosingReportGenerated'));
   };
 
   const generatePLReport = async () => {
@@ -188,7 +190,7 @@ const Reports: React.FC = () => {
     setReports(prev => [newReport, ...prev]);
     setIsGenerating(false);
     setActiveTab('documents');
-    alert(t('plReportGenerated'));
+    showSuccess(t('plReportGenerated'));
   };
 
   return (

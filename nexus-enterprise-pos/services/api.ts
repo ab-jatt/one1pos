@@ -24,6 +24,19 @@ apiClient.interceptors.request.use(async (config) => {
   return config;
 });
 
+// Auto-logout on 401 (expired or invalid token)
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && localStorage.getItem('nexus_auth_token')) {
+      localStorage.removeItem('nexus_auth_token');
+      localStorage.removeItem('nexus_auth_user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  },
+);
+
 // Simulate network delay for mock endpoints
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -57,6 +70,19 @@ export interface Category {
   name: string;
   _count?: {
     products: number;
+    subcategories: number;
+  };
+  subcategories?: Subcategory[];
+}
+
+// Subcategory type
+export interface Subcategory {
+  id: string;
+  name: string;
+  categoryId: string;
+  category?: { id: string; name: string };
+  _count?: {
+    products: number;
   };
 }
 
@@ -75,6 +101,10 @@ export const Api = {
   auth: {
     login: async (email: string, password: string): Promise<{ access_token: string; user: { id: string; email: string; name: string; role: string; branchId: string; avatar?: string } }> => {
       const response = await apiClient.post('/auth/login', { email, password });
+      return response.data;
+    },
+    loginWithFirebase: async (idToken: string): Promise<{ access_token: string; user: { id: string; email: string; name: string; role: string; branchId: string; avatar?: string } }> => {
+      const response = await apiClient.post('/auth/firebase', { idToken });
       return response.data;
     },
     loginWithGoogle: async (idToken: string): Promise<{ access_token: string; user: { id: string; email: string; name: string; role: string; branchId: string; avatar?: string } }> => {
@@ -97,16 +127,36 @@ export const Api = {
         return null;
       }
     },
+    getMe: async () => {
+      const response = await apiClient.get('/users/me');
+      return response.data;
+    },
     getAll: async () => {
       const response = await apiClient.get('/users');
       return response.data;
     },
-    create: async (data: { name: string; email: string; password: string; role: string }) => {
+    create: async (data: { firstName: string; lastName: string; email: string; password: string; role: string }) => {
       const response = await apiClient.post('/users', data);
       return response.data;
     },
-    update: async (id: string, data: { name?: string; email?: string; password?: string; role?: string }) => {
+    update: async (id: string, data: { firstName?: string; lastName?: string; role?: string }) => {
       const response = await apiClient.patch(`/users/${id}`, data);
+      return response.data;
+    },
+    deactivate: async (id: string) => {
+      const response = await apiClient.patch(`/users/${id}/deactivate`);
+      return response.data;
+    },
+    resetPassword: async (id: string, newPassword: string) => {
+      const response = await apiClient.patch(`/users/${id}/reset-password`, { newPassword });
+      return response.data;
+    },
+    updateProfile: async (data: { firstName: string; lastName: string }) => {
+      const response = await apiClient.patch('/users/me/profile', data);
+      return response.data;
+    },
+    changeMyPassword: async (newPassword: string) => {
+      const response = await apiClient.patch('/users/me/password', { newPassword });
       return response.data;
     },
     delete: async (id: string) => {
@@ -220,6 +270,84 @@ export const Api = {
         return true;
       } catch (error) {
         console.error('Error deleting category:', error);
+        throw error;
+      }
+    },
+  },
+
+  // ==================== SUBCATEGORIES ====================
+  subcategories: {
+    getAll: async (categoryId?: string): Promise<Subcategory[]> => {
+      try {
+        const params = categoryId ? `?categoryId=${categoryId}` : '';
+        const response = await apiClient.get(`/subcategories${params}`);
+        return response.data;
+      } catch (error) {
+        console.error('Error fetching subcategories:', error);
+        throw error;
+      }
+    },
+    create: async (name: string, categoryId: string): Promise<Subcategory> => {
+      try {
+        const response = await apiClient.post('/subcategories', { name, categoryId });
+        return response.data;
+      } catch (error) {
+        console.error('Error creating subcategory:', error);
+        throw error;
+      }
+    },
+    update: async (id: string, data: { name?: string; categoryId?: string }): Promise<Subcategory> => {
+      try {
+        const response = await apiClient.patch(`/subcategories/${id}`, data);
+        return response.data;
+      } catch (error) {
+        console.error('Error updating subcategory:', error);
+        throw error;
+      }
+    },
+    delete: async (id: string): Promise<boolean> => {
+      try {
+        await apiClient.delete(`/subcategories/${id}`);
+        return true;
+      } catch (error) {
+        console.error('Error deleting subcategory:', error);
+        throw error;
+      }
+    },
+  },
+
+  // ==================== SETTINGS ====================
+  settings: {
+    get: async (): Promise<{
+      taxRate: number;
+      currency: string;
+      language: string;
+      storeName: string;
+    }> => {
+      try {
+        const response = await apiClient.get('/settings');
+        return response.data;
+      } catch (error) {
+        console.error('Error fetching settings:', error);
+        throw error;
+      }
+    },
+    update: async (data: {
+      taxRate?: number;
+      currency?: string;
+      language?: string;
+      storeName?: string;
+    }): Promise<{
+      taxRate: number;
+      currency: string;
+      language: string;
+      storeName: string;
+    }> => {
+      try {
+        const response = await apiClient.patch('/settings', data);
+        return response.data;
+      } catch (error) {
+        console.error('Error updating settings:', error);
         throw error;
       }
     },
@@ -752,12 +880,21 @@ export const Api = {
         throw error;
       }
     },
-    runPayroll: async (): Promise<boolean> => {
+    runPayroll: async (): Promise<any> => {
       try {
-        await apiClient.post('/employees/payroll');
-        return true;
+        const response = await apiClient.post('/employees/payroll');
+        return response.data;
       } catch (error) {
         console.error('Error running payroll:', error);
+        throw error;
+      }
+    },
+    getPayrollHistory: async (): Promise<any[]> => {
+      try {
+        const response = await apiClient.get('/employees/payroll/history');
+        return response.data;
+      } catch (error) {
+        console.error('Error fetching payroll history:', error);
         throw error;
       }
     },
@@ -846,6 +983,24 @@ export const Api = {
         return response.data;
       } catch (error) {
         console.error('Error creating purchase order:', error);
+        throw error;
+      }
+    },
+    getPO: async (id: string): Promise<any> => {
+      try {
+        const response = await apiClient.get(`/purchase-orders/${id}`);
+        return response.data;
+      } catch (error) {
+        console.error('Error fetching purchase order details:', error);
+        throw error;
+      }
+    },
+    updatePO: async (id: string, po: any): Promise<PurchaseOrder> => {
+      try {
+        const response = await apiClient.patch(`/purchase-orders/${id}`, po);
+        return response.data;
+      } catch (error) {
+        console.error('Error updating purchase order:', error);
         throw error;
       }
     },

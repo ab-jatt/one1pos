@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, Download, Search, RefreshCw, Package, Factory, ArrowLeftRight, DollarSign, AlertTriangle } from 'lucide-react';
 import { Api } from '../services/api';
+import { useLanguage } from '../context/LanguageContext';
+import { useCurrency } from '../context/CurrencyContext';
 
 type ReportTab = 'stockBalance' | 'movements' | 'valuation' | 'production' | 'finishedGoods' | 'lowStock' | 'transfers';
 
@@ -15,6 +17,8 @@ const tabs: { key: ReportTab; label: string; icon: React.ElementType }[] = [
 ];
 
 const WarehouseReports: React.FC = () => {
+  const { t = (key: string) => key } = useLanguage() || {};
+  const { formatMoney = (value: number) => String(value) } = useCurrency() || {};
   const [activeTab, setActiveTab] = useState<ReportTab>('stockBalance');
   const [reportData, setReportData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -72,13 +76,24 @@ const WarehouseReports: React.FC = () => {
   const data = reportData?.data || [];
   const summary = reportData?.summary || {};
 
+  const toLabel = (key: string) => key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+  const isMoneyKey = (key: string) => {
+    const k = key.toLowerCase();
+    return k.includes('cost') || k.includes('value') || k.includes('price') || k.includes('amount');
+  };
+
+  const translate = (key: string, fallback: string) => {
+    const translated = t(key);
+    return translated === key ? fallback : translated;
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">Warehouse Reports</h1>
-          <p className="text-sm text-neutral-500 mt-1">Comprehensive inventory and production analytics</p>
+          <p className="text-sm text-neutral-500 mt-1">{translate('warehouseReportsSubtitle', 'Comprehensive inventory and production analytics')}</p>
         </div>
         <div className="flex gap-2">
           <button onClick={fetchReport} className="p-2.5 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800">
@@ -86,7 +101,7 @@ const WarehouseReports: React.FC = () => {
           </button>
           <button onClick={exportCSV} disabled={!data.length}
             className="flex items-center gap-2 px-4 py-2.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-            <Download className="w-4 h-4" /> Export CSV
+            <Download className="w-4 h-4" /> {translate('exportCsv', 'Export CSV')}
           </button>
         </div>
       </div>
@@ -98,7 +113,7 @@ const WarehouseReports: React.FC = () => {
             className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
               activeTab === tab.key ? 'bg-white dark:bg-neutral-700 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'
             }`}>
-            <tab.icon className="w-3.5 h-3.5" /> {tab.label}
+            <tab.icon className="w-3.5 h-3.5" /> {translate(`warehouseReportTab.${tab.key}`, tab.label)}
           </button>
         ))}
       </div>
@@ -107,7 +122,7 @@ const WarehouseReports: React.FC = () => {
       <div className="flex items-center gap-3 flex-wrap">
         <select value={warehouseFilter} onChange={e => setWarehouseFilter(e.target.value)}
           className="px-3 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
-          <option value="">All Warehouses</option>
+          <option value="">{translate('allWarehouses', 'All Warehouses')}</option>
           {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
@@ -116,7 +131,7 @@ const WarehouseReports: React.FC = () => {
           className="px-3 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm" />
         <button onClick={fetchReport}
           className="px-4 py-2.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-sm font-medium transition-colors">
-          <Search className="w-4 h-4 inline mr-1" /> Generate
+          <Search className="w-4 h-4 inline mr-1" /> {translate('generate', 'Generate')}
         </button>
       </div>
 
@@ -127,7 +142,9 @@ const WarehouseReports: React.FC = () => {
             <div key={key} className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 p-4">
               <p className="text-xs text-neutral-500 mb-1">{key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}</p>
               <p className="text-xl font-bold text-neutral-900 dark:text-white">
-                {typeof value === 'number' ? (key.toLowerCase().includes('cost') || key.toLowerCase().includes('value') ? `$${value.toFixed(2)}` : value.toLocaleString()) : value}
+                {typeof value === 'number'
+                  ? (isMoneyKey(key) ? formatMoney(value) : value.toLocaleString())
+                  : value}
               </p>
             </div>
           ))}
@@ -145,7 +162,7 @@ const WarehouseReports: React.FC = () => {
                 <tr className="border-b border-neutral-100 dark:border-neutral-800">
                   {Object.keys(data[0]).map(key => (
                     <th key={key} className="text-left px-4 py-3 font-medium text-neutral-500 whitespace-nowrap">
-                      {key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}
+                      {toLabel(key)}
                     </th>
                   ))}
                 </tr>
@@ -156,8 +173,8 @@ const WarehouseReports: React.FC = () => {
                     {Object.entries(row).map(([key, val]: [string, any], ci) => (
                       <td key={ci} className="px-4 py-3 whitespace-nowrap">
                         {typeof val === 'number'
-                          ? (key.toLowerCase().includes('cost') || key.toLowerCase().includes('value') || key.toLowerCase().includes('price'))
-                            ? `$${val.toFixed(2)}`
+                          ? (isMoneyKey(key))
+                            ? formatMoney(val)
                             : val.toLocaleString()
                           : val instanceof Date
                             ? new Date(val).toLocaleDateString()
@@ -174,8 +191,8 @@ const WarehouseReports: React.FC = () => {
       ) : (
         <div className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 p-16 text-center">
           <BarChart3 className="w-12 h-12 mx-auto mb-3 text-neutral-300" />
-          <p className="text-neutral-400">No data available for this report</p>
-          <p className="text-xs text-neutral-400 mt-1">Adjust filters and click Generate</p>
+          <p className="text-neutral-400">{translate('noDataAvailable', 'No data available for this report')}</p>
+          <p className="text-xs text-neutral-400 mt-1">{translate('adjustFiltersAndGenerate', 'Adjust filters and click Generate')}</p>
         </div>
       )}
     </div>

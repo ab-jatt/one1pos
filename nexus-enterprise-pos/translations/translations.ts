@@ -1,4 +1,4 @@
-export type Language = 'en' | 'es' | 'ru' | 'de';
+export type Language = 'en' | 'es' | 'ru' | 'de' | 'ur' | 'ar';
 
 export const translations = {
   en: {
@@ -2501,5 +2501,6 @@ export const translations = {
 };
 
 export const getTranslation = (language: Language, key: string): string => {
-  return translations[language]?.[key as keyof typeof translations.en] || translations.en[key as keyof typeof translations.en] || key;
+  const languageDictionary = (translations as Record<string, Record<string, string>>)[language] || {};
+  return languageDictionary[key] || translations.en[key as keyof typeof translations.en] || key;
 };

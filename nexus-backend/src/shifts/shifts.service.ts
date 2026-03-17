@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ShiftsService {
+  private readonly logger = new Logger(ShiftsService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async findAll(branchId: string, employeeId?: string) {
@@ -26,7 +28,7 @@ export class ShiftsService {
     return shifts.map((shift) => this.formatShift(shift));
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, branchId?: string) {
     const shift = await this.prisma.shift.findUnique({
       where: { id },
       include: {
@@ -42,18 +44,29 @@ export class ShiftsService {
       throw new NotFoundException(`Shift with ID ${id} not found`);
     }
 
+    if (branchId && shift.employee?.user?.branchId !== branchId) {
+      throw new NotFoundException(`Shift with ID ${id} not found`);
+    }
+
     return this.formatShift(shift);
   }
 
-  async create(dto: any) {
-    // Validate employee exists
+  async create(dto: any, branchId?: string) {
+    // Validate employee exists and belongs to the same branch
     const employee = await this.prisma.employee.findUnique({
       where: { id: dto.employeeId },
+      include: { user: true },
     });
 
     if (!employee) {
       throw new BadRequestException(`Employee with ID ${dto.employeeId} not found`);
     }
+
+    if (branchId && employee.user?.branchId !== branchId) {
+      throw new BadRequestException(`Employee with ID ${dto.employeeId} not found in this branch`);
+    }
+
+    this.logger.log(`Creating shift for employee ${dto.employeeId} (branch: ${branchId})`);
 
     // Convert to DateTime objects if strings are provided
     let startTime = dto.startTime;
@@ -85,8 +98,8 @@ export class ShiftsService {
     return this.formatShift(shift);
   }
 
-  async update(id: string, dto: any) {
-    await this.findOne(id);
+  async update(id: string, dto: any, branchId?: string) {
+    await this.findOne(id, branchId);
 
     let startTime = dto.startTime;
     let endTime = dto.endTime;
@@ -117,8 +130,8 @@ export class ShiftsService {
     return this.formatShift(updated);
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(id: string, branchId?: string) {
+    await this.findOne(id, branchId);
 
     await this.prisma.shift.delete({
       where: { id },

@@ -9,14 +9,14 @@ import { AdjustBalanceDto } from './dto/adjust-balance.dto';
 export class CustomersService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll() {
+  async findAll(branchId: string) {
     return this.prisma.customer.findMany({
-      where: { deletedAt: null },
+      where: { branchId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, branchId?: string) {
     const customer = await this.prisma.customer.findUnique({
       where: { id },
       include: {
@@ -31,10 +31,14 @@ export class CustomersService {
       throw new NotFoundException(`Customer with ID ${id} not found`);
     }
 
+    if (branchId && customer.branchId !== branchId) {
+      throw new NotFoundException(`Customer with ID ${id} not found`);
+    }
+
     return customer;
   }
 
-  async create(createCustomerDto: CreateCustomerDto) {
+  async create(createCustomerDto: CreateCustomerDto, branchId: string) {
     return this.prisma.customer.create({
       data: {
         name: createCustomerDto.name,
@@ -42,12 +46,13 @@ export class CustomersService {
         phone: createCustomerDto.phone,
         points: 0,
         balance: 0,
+        branchId,
       },
     });
   }
 
-  async update(id: string, updateCustomerDto: UpdateCustomerDto) {
-    await this.findOne(id); // Check if exists
+  async update(id: string, updateCustomerDto: UpdateCustomerDto, branchId: string) {
+    await this.findOne(id, branchId);
 
     return this.prisma.customer.update({
       where: { id },
@@ -55,18 +60,17 @@ export class CustomersService {
     });
   }
 
-  async remove(id: string) {
-    await this.findOne(id); // Check if exists
+  async remove(id: string, branchId: string) {
+    await this.findOne(id, branchId);
 
-    // Soft delete
     return this.prisma.customer.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
   }
 
-  async adjustPoints(id: string, adjustPointsDto: AdjustPointsDto) {
-    const customer = await this.findOne(id);
+  async adjustPoints(id: string, adjustPointsDto: AdjustPointsDto, branchId: string) {
+    const customer = await this.findOne(id, branchId);
 
     const newPoints = Math.max(0, customer.points + adjustPointsDto.points);
 
@@ -76,8 +80,8 @@ export class CustomersService {
     });
   }
 
-  async adjustBalance(id: string, adjustBalanceDto: AdjustBalanceDto) {
-    const customer = await this.findOne(id);
+  async adjustBalance(id: string, adjustBalanceDto: AdjustBalanceDto, branchId: string) {
+    const customer = await this.findOne(id, branchId);
 
     const adjustment =
       adjustBalanceDto.type === 'CREDIT'
@@ -92,9 +96,9 @@ export class CustomersService {
     });
   }
 
-  async getLedger(id: string, startDate?: string, endDate?: string) {
-    // Verify customer exists
-    await this.findOne(id);
+  async getLedger(id: string, branchId: string, startDate?: string, endDate?: string) {
+    // Verify customer exists and belongs to this branch
+    await this.findOne(id, branchId);
 
     // Build date filter
     const dateFilter: any = {};

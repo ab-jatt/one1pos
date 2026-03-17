@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
+import { BranchIsolationInterceptor } from './auth/branch-isolation.interceptor';
 import { ProductsModule } from './products/products.module';
 import { CategoriesModule } from './categories/categories.module';
+import { SubcategoriesModule } from './subcategories/subcategories.module';
 import { CustomersModule } from './customers/customers.module';
 import { OrdersModule } from './orders/orders.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -25,6 +27,7 @@ import { WarehouseReportsModule } from './warehouse-reports/warehouse-reports.mo
 import { FirebaseModule } from './firebase/firebase.module';
 import { UsersModule } from './users/users.module';
 import { PosModule } from './pos/pos.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -33,6 +36,7 @@ import { PosModule } from './pos/pos.module';
     UsersModule,
     ProductsModule,
     CategoriesModule,
+    SubcategoriesModule,
     CustomersModule,
     OrdersModule,
     DashboardModule,
@@ -49,12 +53,14 @@ import { PosModule } from './pos/pos.module';
     ProductionOrdersModule,
     WarehouseReportsModule,
     PosModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_INTERCEPTOR, useClass: BranchIsolationInterceptor },
   ],
 })
 export class AppModule {}

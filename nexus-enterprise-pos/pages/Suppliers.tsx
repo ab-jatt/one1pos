@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
 import { Api } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
+import { useToast } from '../context/ToastContext';
 import { Supplier } from '../types';
 import { Search, Plus, MapPin, Phone, Mail, Filter, MoreHorizontal, Truck, X, Save, Edit2, Trash2, CreditCard } from 'lucide-react';
 import Dropdown from '../components/ui/Dropdown';
@@ -10,6 +11,7 @@ import { AccessGate } from '../components/ui/AccessGate';
 
 const Suppliers: React.FC = () => {
   const { t } = useLanguage();
+  const { showWarning } = useToast();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -64,7 +66,7 @@ const Suppliers: React.FC = () => {
 
   const handleSave = async () => {
     if (!currentSupplier.name || !currentSupplier.email) {
-        alert('Name and Email are required.');
+        showWarning('Name and Email are required.');
         return;
     }
 

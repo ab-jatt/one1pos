@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Factory, Plus, Search, X, ArrowDown, ArrowUp, Package, ChevronRight, AlertCircle } from 'lucide-react';
 import { Api } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 const statusColors: Record<string, string> = {
   DRAFT: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
@@ -21,6 +22,7 @@ const statusLabels: Record<string, string> = {
 };
 
 const Production: React.FC = () => {
+  const { showSuccess, showError, showWarning } = useToast();
   const [orders, setOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -64,7 +66,7 @@ const Production: React.FC = () => {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleCreate = async () => {
-    if (!createForm.productId || createForm.quantity < 1) return alert('Please fill required fields');
+    if (!createForm.productId || createForm.quantity < 1) { showWarning('Please fill required fields'); return; }
     try {
       const validItems = createForm.items.filter(i => i.productId && i.requiredQty > 0);
       await Api.productionOrders.create({
@@ -77,7 +79,7 @@ const Production: React.FC = () => {
       setCreateForm({ productId: '', quantity: 1, notes: '', items: [{ productId: '', requiredQty: 1, unitCost: 0 }] });
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to create production order');
+      showError(err.response?.data?.message || 'Failed to create production order');
     }
   };
 
@@ -96,9 +98,9 @@ const Production: React.FC = () => {
   };
 
   const handleIssue = async () => {
-    if (!selectedOrder || !issueForm.warehouseId) return alert('Select a warehouse');
+    if (!selectedOrder || !issueForm.warehouseId) { showWarning('Select a warehouse'); return; }
     const validItems = issueForm.items.filter(i => i.quantity > 0);
-    if (validItems.length === 0) return alert('No items to issue');
+    if (validItems.length === 0) { showWarning('No items to issue'); return; }
     try {
       await Api.productionOrders.issueMaterials(selectedOrder.id, {
         warehouseId: issueForm.warehouseId,
@@ -107,7 +109,7 @@ const Production: React.FC = () => {
       setShowIssueModal(false);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Issue failed');
+      showError(err.response?.data?.message || 'Issue failed');
     }
   };
 
@@ -118,7 +120,7 @@ const Production: React.FC = () => {
   };
 
   const handleReceive = async () => {
-    if (!selectedOrder || !receiveForm.warehouseId) return alert('Select a warehouse');
+    if (!selectedOrder || !receiveForm.warehouseId) { showWarning('Select a warehouse'); return; }
     try {
       await Api.productionOrders.receiveGoods(selectedOrder.id, {
         warehouseId: receiveForm.warehouseId,
@@ -127,7 +129,7 @@ const Production: React.FC = () => {
       setShowReceiveModal(false);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Receive failed');
+      showError(err.response?.data?.message || 'Receive failed');
     }
   };
 
@@ -137,7 +139,7 @@ const Production: React.FC = () => {
       await Api.productionOrders.cancel(id);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Cancel failed');
+      showError(err.response?.data?.message || 'Cancel failed');
     }
   };
 
@@ -146,7 +148,7 @@ const Production: React.FC = () => {
       await Api.productionOrders.updateStatus(id, status);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Status update failed');
+      showError(err.response?.data?.message || 'Status update failed');
     }
   };
 

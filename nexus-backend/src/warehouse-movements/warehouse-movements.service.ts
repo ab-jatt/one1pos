@@ -307,25 +307,39 @@ export class WarehouseMovementsService {
     warehouseId: string;
     productId: string;
     quantity: number;
-    type: 'IN' | 'OUT';
+    type?: 'IN' | 'OUT' | 'ADJUSTMENT_IN' | 'ADJUSTMENT_OUT';
     reason?: string;
     createdById?: string;
   }) {
     const product = await this.prisma.product.findUnique({ where: { id: dto.productId } });
     if (!product) throw new BadRequestException('Product not found');
 
-    const movementType = dto.type === 'IN' ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT';
+    const rawQuantity = Number(dto.quantity);
+    if (!Number.isFinite(rawQuantity) || rawQuantity === 0) {
+      throw new BadRequestException('Quantity must be a non-zero number');
+    }
+
+    const normalizedType = dto.type === 'ADJUSTMENT_IN'
+      ? 'IN'
+      : dto.type === 'ADJUSTMENT_OUT'
+        ? 'OUT'
+        : dto.type;
+
+    // Preserve signed payloads while still supporting legacy IN/OUT type-based requests.
+    const isInbound = rawQuantity < 0 ? false : (normalizedType ? normalizedType === 'IN' : true);
+    const quantity = Math.abs(rawQuantity);
+    const movementType = isInbound ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT';
 
     return this.createMovement({
-      branchId: dto.branchId || 'main-branch-id',
+      branchId: dto.branchId,
       productId: dto.productId,
-      fromWarehouseId: dto.type === 'OUT' ? dto.warehouseId : undefined,
-      toWarehouseId: dto.type === 'IN' ? dto.warehouseId : undefined,
-      quantity: dto.quantity,
+      fromWarehouseId: !isInbound ? dto.warehouseId : undefined,
+      toWarehouseId: isInbound ? dto.warehouseId : undefined,
+      quantity,
       unitCost: Number(product.costPrice),
       movementType: movementType as WarehouseMovementType,
       referenceType: 'ADJUSTMENT',
-      notes: dto.reason || `Manual ${dto.type} adjustment`,
+      notes: dto.reason || `Manual ${isInbound ? 'IN' : 'OUT'} adjustment`,
       createdById: dto.createdById,
     });
   }
@@ -346,13 +360,13 @@ export class WarehouseMovementsService {
     }
 
     const results = await this.prisma.$transaction(async (tx) => {
-      // Generate transfer number
-      const count = await tx.stockTransfer.count();
+      // Generate transfer number scoped to branch
+      const count = await tx.stockTransfer.count({ where: { branchId: dto.branchId } });
       const transferNumber = `TRF-${String(count + 1).padStart(6, '0')}`;
 
       const transfer = await tx.stockTransfer.create({
         data: {
-          branchId: dto.branchId || 'main-branch-id',
+          branchId: dto.branchId,
           transferNumber,
           fromWarehouseId: dto.fromWarehouseId,
           toWarehouseId: dto.toWarehouseId,
@@ -397,7 +411,7 @@ export class WarehouseMovementsService {
 
         await tx.warehouseMovement.create({
           data: {
-            branchId: dto.branchId || 'main-branch-id',
+            branchId: dto.branchId,
             productId: item.productId,
             fromWarehouseId: dto.fromWarehouseId,
             toWarehouseId: dto.toWarehouseId,

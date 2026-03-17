@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import type { Language } from '../context/LanguageContext';
 import { Mail, Lock, Eye, EyeOff, ScanLine, Terminal, Activity, Wifi, Globe } from 'lucide-react';
 
 const Login: React.FC = () => {
@@ -93,7 +94,7 @@ const Login: React.FC = () => {
     return () => clearInterval(interval);
   }, [language, t]);
 
-  const handleLanguageChange = (newLanguage: 'en' | 'es' | 'ru' | 'de') => {
+  const handleLanguageChange = (newLanguage: Language) => {
     setLanguage(newLanguage);
     setShowLanguageMenu(false);
   };
@@ -143,7 +144,7 @@ const Login: React.FC = () => {
           {showLanguageMenu && (
             <div className="absolute right-0 mt-2 w-44 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg shadow-xl overflow-hidden z-30 animate-dropdown-open">
               <div className="py-1">
-              {(['en', 'es', 'ru', 'de'] as const).map((lang) => (
+              {(['en', 'es', 'ru', 'de', 'ur', 'ar'] as const).map((lang) => (
                 <button
                   key={lang}
                   onClick={() => handleLanguageChange(lang)}
@@ -158,6 +159,8 @@ const Login: React.FC = () => {
                   {lang === 'es' && '🇪🇸 Español'}
                   {lang === 'ru' && '🇷🇺 Русский'}
                   {lang === 'de' && '🇩🇪 Deutsch'}
+                  {lang === 'ur' && '🇵🇰 اردو'}
+                  {lang === 'ar' && '🇸🇦 العربية'}
                   </span>
                 </button>
               ))}
@@ -225,7 +228,7 @@ const Login: React.FC = () => {
         </div>
 
         {/* Right Side - Form Panel */}
-        <div className="lg:w-[55%] w-full relative flex flex-col justify-center p-5 sm:p-6 lg:p-8 bg-neutral-50 dark:bg-neutral-950/50">
+        <div className="lg:w-[55%] w-full relative flex flex-col p-5 sm:p-6 lg:p-8 bg-neutral-50 dark:bg-neutral-950/50">
            {/* Decorative Lines */}
            <div className="absolute top-0 left-8 w-px h-full bg-neutral-200 dark:bg-neutral-800"></div>
            <div className="absolute top-8 left-0 w-full h-px bg-neutral-200 dark:bg-neutral-800"></div>
@@ -234,7 +237,7 @@ const Login: React.FC = () => {
            <div className="absolute right-0 top-0 w-64 h-64 bg-sky-500/5 blur-3xl rounded-full"></div>
            <div className="absolute left-0 bottom-0 w-64 h-64 bg-neutral-500/5 blur-3xl rounded-full"></div>
 
-           <div className="relative z-10 max-w-md mx-auto w-full">
+           <div className="relative z-10 max-w-md mx-auto w-full my-auto">
 
               <div>
                 {/* Error/Success Messages */}

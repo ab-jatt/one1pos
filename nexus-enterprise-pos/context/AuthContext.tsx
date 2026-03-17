@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { signInWithPopup } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
 import { User, Role } from '../types';
 import { Api } from '../services/api';
@@ -36,7 +36,11 @@ const DEFAULT_PERMISSIONS: Record<string, string[]> = {
     'pos.operate',
     'customers.view', 'customers.add',
     'inventory.view'
-  ]
+  ],
+  STAFF: [
+    'inventory.view',
+    'customers.view'
+  ],
 };
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -63,7 +67,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     setError(null);
     try {
-      const response = await Api.auth.login(email, password);
+      const credentials = await signInWithEmailAndPassword(auth, email, password);
+      const idToken = await credentials.user.getIdToken();
+      const response = await Api.auth.loginWithFirebase(idToken);
       const { access_token, user: userData } = response;
 
       // Store token
@@ -82,8 +88,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       localStorage.setItem('nexus_auth_user', JSON.stringify(appUser));
       setUser(appUser);
+      window.dispatchEvent(new Event('nexus-auth-changed'));
     } catch (err: any) {
-      const message = err.response?.data?.message || 'Invalid email or password';
+      const firebaseCode = err?.code as string | undefined;
+      const isFirebaseCode = typeof firebaseCode === 'string' && firebaseCode.startsWith('auth/');
+      const message = isFirebaseCode
+        ? mapFirebaseError(firebaseCode)
+        : (err.response?.data?.message || 'Invalid email or password');
       setError(message);
       throw new Error(message);
     } finally {
@@ -97,6 +108,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const idToken = await result.user.getIdToken();
+
+      // Debug: confirm what Firebase returned before hitting the backend
+      console.log('[Google Login] Firebase auth succeeded');
+      console.log('[Google Login] user.uid   =', result.user.uid);
+      console.log('[Google Login] user.email =', result.user.email);
+      console.log('[Google Login] Sending ID token to backend /auth/google');
 
       const response = await Api.auth.loginWithGoogle(idToken);
       const { access_token, user: userData } = response;
@@ -115,6 +132,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       localStorage.setItem('nexus_auth_user', JSON.stringify(appUser));
       setUser(appUser);
+      window.dispatchEvent(new Event('nexus-auth-changed'));
     } catch (err: any) {
       // User closed the popup — not an error worth showing
       if (
@@ -123,7 +141,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       ) {
         return;
       }
-      const message = err.response?.data?.message || 'Google sign-in failed. Please try again.';
+      // Backend rejected this Google account (not in authorized owners list).
+      // Sign the user out of Firebase immediately so they are not left in an
+      // authenticated-but-unauthorized state.
+      await signOut(auth).catch(() => {});
+      const message =
+        err.response?.data?.message ||
+        'Access denied. Please sign in with an authorized account.';
       setError(message);
       throw new Error(message);
     } finally {
@@ -136,6 +160,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('nexus_auth_token');
     localStorage.removeItem('nexus_auth_user');
     setError(null);
+    window.dispatchEvent(new Event('nexus-auth-changed'));
   };
 
   return (

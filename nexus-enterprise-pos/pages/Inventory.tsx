@@ -2,18 +2,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '../components/ui/Card';
 import { AccessGate } from '../components/ui/AccessGate';
-import { Api, Category } from '../services/api';
+import { Api, Category, Subcategory } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
-import { Package, Search, Filter, Download, Plus, X, Image as ImageIcon, Save, Trash2, Edit2, RefreshCw, AlertTriangle, TrendingUp, DollarSign, Box, Loader2, Calendar, Upload } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
+import { Package, Search, Filter, Download, Plus, X, Image as ImageIcon, Save, Trash2, Edit2, RefreshCw, AlertTriangle, TrendingUp, DollarSign, Box, Loader2, Calendar, Upload, Check } from 'lucide-react';
 import Dropdown from '../components/ui/Dropdown';
 import { Product, Role } from '../types';
 
 const Inventory: React.FC = () => {
   const { t = (key: string) => key } = useLanguage() || {};
   const { formatMoney = (val: number) => `$${val.toFixed(2)}` } = useCurrency() || {};
+  const { showSuccess, showError, showWarning } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -23,7 +26,7 @@ const Inventory: React.FC = () => {
 
   // Add Product State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newProduct, setNewProduct] = useState<Partial<Product> & { categoryId?: string }>({
+  const [newProduct, setNewProduct] = useState<Partial<Product> & { categoryId?: string; subcategoryId?: string }>({
     name: '',
     category: 'Latif',
     price: 0,
@@ -37,12 +40,18 @@ const Inventory: React.FC = () => {
 
   // Edit Product State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<(Product & { categoryId?: string }) | null>(null);
+  const [editingProduct, setEditingProduct] = useState<(Product & { categoryId?: string; subcategoryId?: string }) | null>(null);
 
   // Add Category State
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+
+  // Add Subcategory State
+  const [isSubcategoryModalOpen, setIsSubcategoryModalOpen] = useState(false);
+  const [newSubcategoryName, setNewSubcategoryName] = useState('');
+  const [newSubcategoryCategoryId, setNewSubcategoryCategoryId] = useState('');
+  const [isCreatingSubcategory, setIsCreatingSubcategory] = useState(false);
 
   // Stock Ledger State
   const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
@@ -61,17 +70,29 @@ const Inventory: React.FC = () => {
   });
   const [ledgerEndDate, setLedgerEndDate] = useState(() => new Date().toISOString().split('T')[0]);
 
+  // Inline-edit state for categories
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState('');
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
+
+  // Inline-edit state for subcategories
+  const [editingSubcategoryId, setEditingSubcategoryId] = useState<string | null>(null);
+  const [editingSubcategoryName, setEditingSubcategoryName] = useState('');
+  const [isSavingSubcategory, setIsSavingSubcategory] = useState(false);
+
   // Fetch products and categories on mount
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const [productsData, categoriesData] = await Promise.all([
+        const [productsData, categoriesData, subcategoriesData] = await Promise.all([
           Api.products.getAll(),
           Api.categories.getAll(),
+          Api.subcategories.getAll(),
         ]);
         setProducts(productsData);
         setCategories(categoriesData);
+        setSubcategories(subcategoriesData);
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -105,14 +126,27 @@ const Inventory: React.FC = () => {
   const lowStockCount = products.filter(p => Number(p.stock) < 20).length;
   const totalItems = products.reduce((acc, p) => acc + Number(p.stock), 0);
 
+  const parseNonNegativeInt = (value: string): number => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return 0;
+    }
+    const parsed = Number.parseInt(trimmed, 10);
+    if (Number.isNaN(parsed)) {
+      return 0;
+    }
+    return Math.max(0, parsed);
+  };
+
   const handleDelete = async (id: string) => {
     if (confirm(t('deleteConfirm'))) {
       try {
         await Api.products.delete(id);
         setProducts(prev => prev.filter(p => p.id !== id));
+        showSuccess('Product deleted successfully');
       } catch (error) {
         console.error('Error deleting product:', error);
-        alert(t('deleteFailure'));
+        showError(t('deleteFailure'));
       }
     }
   };
@@ -126,7 +160,7 @@ const Inventory: React.FC = () => {
       setLedgerData(data);
     } catch (error) {
       console.error('Error fetching stock ledger:', error);
-      alert('Failed to load stock ledger');
+      showError('Failed to load stock ledger');
     } finally {
       setLedgerLoading(false);
     }
@@ -182,8 +216,8 @@ const Inventory: React.FC = () => {
   };
 
   const handleAddProduct = async () => {
-    if (!newProduct.name || !newProduct.price || !newProduct.sku) {
-      alert('Please fill in required fields');
+    if (!newProduct.name || !newProduct.price) {
+      showWarning('Please fill in product name and price');
       return;
     }
 
@@ -194,17 +228,18 @@ const Inventory: React.FC = () => {
       const productData = {
         name: newProduct.name!,
         sku: newProduct.sku!,
-        ...(newProduct.productCode?.trim() && { productCode: newProduct.productCode.trim() }),
         ...(newProduct.barcode?.trim() && { barcode: newProduct.barcode.trim() }),
         price: Number(newProduct.price),
         costPrice: Number(newProduct.costPrice) || 0,
         categoryId: category?.id || categories[0]?.id,
+        subcategoryId: newProduct.subcategoryId || undefined,
         image: newProduct.image || `https://picsum.photos/200/200?random=${Math.floor(Math.random() * 1000)}`,
-        stock: Number(newProduct.stock) || 0,
+        stock: Math.max(0, Number(newProduct.stock) || 0),
       };
 
       const createdProduct = await Api.products.create(productData);
       setProducts(prev => [createdProduct, ...prev]);
+      showSuccess('Product created successfully');
       setIsAddModalOpen(false);
       setNewProduct({
         name: '',
@@ -217,16 +252,17 @@ const Inventory: React.FC = () => {
         barcode: '',
         image: 'https://picsum.photos/200/200?random=' + Math.floor(Math.random() * 1000)
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating product:', error);
-      alert('Failed to create product');
+      const msg = error.response?.data?.message || 'Failed to create product';
+      showError(msg);
     }
   };
 
   const handleEditClick = (product: Product) => {
     // Find category ID from name
     const category = categories.find(c => c.name === product.category);
-    setEditingProduct({ ...product, categoryId: category?.id });
+    setEditingProduct({ ...product, categoryId: category?.id, subcategoryId: product.subcategoryId || undefined });
     setIsEditModalOpen(true);
   };
 
@@ -234,7 +270,7 @@ const Inventory: React.FC = () => {
     if (!editingProduct) return;
 
     if (!editingProduct.name || !editingProduct.price || !editingProduct.sku) {
-       alert('Please fill in required fields');
+       showWarning('Please fill in required fields');
        return;
     }
 
@@ -245,22 +281,24 @@ const Inventory: React.FC = () => {
       const updateData = {
         name: editingProduct.name,
         sku: editingProduct.sku,
-        productCode: editingProduct.productCode?.trim() || undefined,
         barcode: editingProduct.barcode?.trim() || undefined,
         price: Number(editingProduct.price),
         costPrice: Number(editingProduct.costPrice),
         categoryId: category?.id || editingProduct.categoryId,
+        subcategoryId: editingProduct.subcategoryId || null,
         image: editingProduct.image,
         stock: Number(editingProduct.stock),
       };
 
       const updatedProduct = await Api.products.update(editingProduct.id, updateData);
       setProducts(prev => prev.map(p => p.id === editingProduct.id ? updatedProduct : p));
+      showSuccess('Product updated successfully');
       setIsEditModalOpen(false);
       setEditingProduct(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating product:', error);
-      alert('Failed to update product');
+      const msg = error.response?.data?.message || 'Failed to update product';
+      showError(msg);
     }
   };
 
@@ -274,7 +312,7 @@ const Inventory: React.FC = () => {
       const url = await Api.products.uploadImage(file);
       setUrl(url);
     } catch {
-      alert('Failed to upload image. Please check your connection and try again.');
+      showError('Failed to upload image. Please check your connection and try again.');
     } finally {
       setUploading(false);
     }
@@ -282,13 +320,13 @@ const Inventory: React.FC = () => {
 
   const handleCreateCategory = async () => {
     if (!newCategoryName.trim()) {
-      alert('Please enter a category name');
+      showWarning('Please enter a category name');
       return;
     }
 
     // Check for duplicate category names
     if (categories.some(c => c.name.toLowerCase() === newCategoryName.trim().toLowerCase())) {
-      alert('A category with this name already exists');
+      showWarning('A category with this name already exists');
       return;
     }
 
@@ -296,13 +334,92 @@ const Inventory: React.FC = () => {
       setIsCreatingCategory(true);
       const createdCategory = await Api.categories.create(newCategoryName.trim());
       setCategories(prev => [...prev, createdCategory]);
+      showSuccess('Category created successfully');
       setIsCategoryModalOpen(false);
       setNewCategoryName('');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating category:', error);
-      alert('Failed to create category');
+      const msg = error.response?.data?.message || 'Failed to create category';
+      showError(msg);
     } finally {
       setIsCreatingCategory(false);
+    }
+  };
+
+  const handleEditCategoryClick = (cat: Category) => {
+    setEditingCategoryId(cat.id);
+    setEditingCategoryName(cat.name);
+  };
+
+  const handleSaveCategory = async (catId: string) => {
+    if (!editingCategoryName.trim()) {
+      showWarning('Category name cannot be empty');
+      return;
+    }
+    try {
+      setIsSavingCategory(true);
+      const updated = await Api.categories.update(catId, editingCategoryName.trim());
+      setCategories(prev => prev.map(c => c.id === catId ? { ...c, name: updated.name } : c));
+      showSuccess('Category renamed successfully');
+      setEditingCategoryId(null);
+    } catch (error: any) {
+      console.error('Error renaming category:', error);
+      const msg = error.response?.data?.message || 'Failed to rename category';
+      showError(msg);
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
+
+  const handleEditSubcategoryClick = (sc: Subcategory) => {
+    setEditingSubcategoryId(sc.id);
+    setEditingSubcategoryName(sc.name);
+  };
+
+  const handleSaveSubcategory = async (scId: string) => {
+    if (!editingSubcategoryName.trim()) {
+      showWarning('Subcategory name cannot be empty');
+      return;
+    }
+    try {
+      setIsSavingSubcategory(true);
+      const updated = await Api.subcategories.update(scId, { name: editingSubcategoryName.trim() });
+      setSubcategories(prev => prev.map(sc => sc.id === scId ? { ...sc, name: updated.name } : sc));
+      showSuccess('Subcategory renamed successfully');
+      setEditingSubcategoryId(null);
+    } catch (error: any) {
+      console.error('Error renaming subcategory:', error);
+      const msg = error.response?.data?.message || 'Failed to rename subcategory';
+      showError(msg);
+    } finally {
+      setIsSavingSubcategory(false);
+    }
+  };
+
+  const handleCreateSubcategory = async () => {
+    if (!newSubcategoryName.trim()) {
+      showWarning('Please enter a subcategory name');
+      return;
+    }
+    if (!newSubcategoryCategoryId) {
+      showWarning('Please select a parent category');
+      return;
+    }
+
+    try {
+      setIsCreatingSubcategory(true);
+      const created = await Api.subcategories.create(newSubcategoryName.trim(), newSubcategoryCategoryId);
+      setSubcategories(prev => [...prev, created]);
+      showSuccess('Subcategory created successfully');
+      setIsSubcategoryModalOpen(false);
+      setNewSubcategoryName('');
+      setNewSubcategoryCategoryId('');
+    } catch (error: any) {
+      console.error('Error creating subcategory:', error);
+      const msg = error.response?.data?.message || 'Failed to create subcategory';
+      showError(msg);
+    } finally {
+      setIsCreatingSubcategory(false);
     }
   };
 
@@ -431,6 +548,14 @@ const Inventory: React.FC = () => {
                <Plus className="w-3.5 h-3.5" /> Category
              </button>
 
+             {/* Add Subcategory Button */}
+             <button
+               onClick={() => setIsSubcategoryModalOpen(true)}
+               className="flex items-center gap-1.5 px-3 py-2.5 bg-white dark:bg-neutral-900 border border-dashed border-neutral-300 dark:border-neutral-600 rounded-lg text-xs font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 hover:border-emerald-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-all duration-200"
+             >
+               <Plus className="w-3.5 h-3.5" /> Subcategory
+             </button>
+
              {/* Stock Filter */}
              <Dropdown
                options={[
@@ -485,6 +610,11 @@ const Inventory: React.FC = () => {
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700">
                       {product.category}
                     </span>
+                    {product.subcategory && (
+                      <span className="inline-flex items-center ml-1 px-2 py-0.5 rounded text-[10px] font-medium tracking-wide bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700">
+                        {product.subcategory}
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-right font-mono text-neutral-500 dark:text-neutral-400">{formatMoney(Number(product.costPrice))}</td>
                   <td className="px-6 py-4 text-right font-mono font-bold text-neutral-800 dark:text-white">{formatMoney(Number(product.price))}</td>
@@ -657,8 +787,28 @@ const Inventory: React.FC = () => {
                    <Dropdown
                      options={categories.map(c => ({ value: c.name, label: c.name }))}
                      value={newProduct.category}
-                     onChange={(val) => setNewProduct({...newProduct, category: val})}
+                     onChange={(val) => setNewProduct({...newProduct, category: val, subcategoryId: undefined})}
                      placeholder={t('category')}
+                     size="md"
+                     buttonClassName="rounded-xl py-3"
+                   />
+                </div>
+                
+                <div>
+                   <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">Subcategory <span className="font-normal lowercase text-neutral-400">(optional)</span></label>
+                   <Dropdown
+                     options={[
+                       { value: '', label: 'None' },
+                       ...subcategories
+                         .filter(sc => {
+                           const cat = categories.find(c => c.name === newProduct.category);
+                           return cat && sc.categoryId === cat.id;
+                         })
+                         .map(sc => ({ value: sc.id, label: sc.name }))
+                     ]}
+                     value={newProduct.subcategoryId || ''}
+                     onChange={(val) => setNewProduct({...newProduct, subcategoryId: val || undefined})}
+                     placeholder="Subcategory"
                      size="md"
                      buttonClassName="rounded-xl py-3"
                    />
@@ -676,14 +826,10 @@ const Inventory: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">Product Code <span className="font-normal lowercase text-neutral-400">(auto if blank)</span></label>
-                  <input 
-                    type="text" 
-                    value={newProduct.productCode}
-                    onChange={e => setNewProduct({...newProduct, productCode: e.target.value})}
-                    placeholder="e.g. PRD-000001"
-                    className="w-full px-4 py-3 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all font-mono text-sm text-neutral-900 dark:text-white" 
-                  />
+                  <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">Product Code <span className="font-normal normal-case text-emerald-500 dark:text-emerald-400 tracking-normal text-[10px]">(auto-generated)</span></label>
+                  <div className="w-full px-4 py-3 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl font-mono text-sm text-neutral-400 dark:text-neutral-500 cursor-not-allowed select-none">
+                    Assigned automatically
+                  </div>
                 </div>
 
                 <div>
@@ -729,23 +875,15 @@ const Inventory: React.FC = () => {
                 </div>
 
                 <div className="col-span-2">
-                   <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">Initial Stock</label>
-                   <div className="flex items-center gap-4">
-                        <input 
-                            type="range" 
-                            min="0" 
-                            max="500" 
-                            value={newProduct.stock} 
-                            onChange={e => setNewProduct({...newProduct, stock: parseInt(e.target.value)})}
-                            className="flex-1 h-2 bg-neutral-200 dark:bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
-                        />
-                        <input 
-                            type="number" 
-                            value={newProduct.stock}
-                            onChange={e => setNewProduct({...newProduct, stock: parseInt(e.target.value)})}
-                            className="w-24 px-3 py-2 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg text-center font-mono font-bold" 
-                        />
-                   </div>
+                   <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">Opening Stock</label>
+                   <input 
+                     type="number"
+                     min="0"
+                     step="1"
+                     value={newProduct.stock ?? 0}
+                     onChange={e => setNewProduct({ ...newProduct, stock: parseNonNegativeInt(e.target.value) })}
+                     className="w-24 px-3 py-2 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg text-center font-mono font-bold" 
+                   />
                 </div>
 
                 <div className="col-span-2">
@@ -850,8 +988,28 @@ const Inventory: React.FC = () => {
                    <Dropdown
                      options={categories.map(c => ({ value: c.name, label: c.name }))}
                      value={editingProduct.category}
-                     onChange={(val) => setEditingProduct({...editingProduct, category: val})}
+                     onChange={(val) => setEditingProduct({...editingProduct, category: val, subcategoryId: undefined})}
                      placeholder="Category"
+                     size="md"
+                     buttonClassName="rounded-xl py-3"
+                   />
+                </div>
+                
+                <div>
+                   <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">Subcategory <span className="font-normal lowercase text-neutral-400">(optional)</span></label>
+                   <Dropdown
+                     options={[
+                       { value: '', label: 'None' },
+                       ...subcategories
+                         .filter(sc => {
+                           const cat = categories.find(c => c.name === editingProduct.category);
+                           return cat && sc.categoryId === cat.id;
+                         })
+                         .map(sc => ({ value: sc.id, label: sc.name }))
+                     ]}
+                     value={editingProduct.subcategoryId || ''}
+                     onChange={(val) => setEditingProduct({...editingProduct, subcategoryId: val || undefined})}
+                     placeholder="Subcategory"
                      size="md"
                      buttonClassName="rounded-xl py-3"
                    />
@@ -868,14 +1026,10 @@ const Inventory: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">Product Code</label>
-                  <input 
-                    type="text" 
-                    value={editingProduct.productCode || ''}
-                    onChange={e => setEditingProduct({...editingProduct, productCode: e.target.value})}
-                    placeholder="e.g. PRD-000001"
-                    className="w-full px-4 py-3 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all font-mono text-sm text-neutral-900 dark:text-white" 
-                  />
+                  <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">Product Code <span className="font-normal normal-case text-amber-500 dark:text-amber-400 tracking-normal text-[10px]">locked</span></label>
+                  <div className="w-full px-4 py-3 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl font-mono text-sm text-neutral-500 dark:text-neutral-400 cursor-not-allowed select-none flex items-center gap-2">
+                    <span>{editingProduct.productCode || '—'}</span>
+                  </div>
                 </div>
 
                 <div>
@@ -922,22 +1076,14 @@ const Inventory: React.FC = () => {
 
                 <div className="col-span-2">
                    <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">Stock Qty</label>
-                   <div className="flex items-center gap-4">
-                        <input 
-                            type="range" 
-                            min="0" 
-                            max="500" 
-                            value={editingProduct.stock} 
-                            onChange={e => setEditingProduct({...editingProduct, stock: parseInt(e.target.value) || 0})}
-                            className="flex-1 h-2 bg-neutral-200 dark:bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
-                        />
-                        <input 
-                            type="number" 
-                            value={editingProduct.stock}
-                            onChange={e => setEditingProduct({...editingProduct, stock: parseInt(e.target.value) || 0})}
-                            className="w-24 px-3 py-2 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg text-center font-mono font-bold" 
-                        />
-                   </div>
+                   <input 
+                     type="number"
+                     min="0"
+                     step="1"
+                     value={editingProduct.stock}
+                     onChange={e => setEditingProduct({ ...editingProduct, stock: parseNonNegativeInt(e.target.value) })}
+                     className="w-24 px-3 py-2 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg text-center font-mono font-bold" 
+                   />
                 </div>
               </div>
             </div>
@@ -1013,17 +1159,55 @@ const Inventory: React.FC = () => {
                   <label className="block text-xs font-bold text-neutral-500 dark:text-neutral-400 mb-2 uppercase tracking-wider">
                     Existing Categories ({categories.length})
                   </label>
-                  <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto p-2 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-100 dark:border-neutral-700/50">
+                  <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-100 dark:border-neutral-700/50">
                     {categories.map(cat => (
-                      <span 
-                        key={cat.id} 
-                        className="px-2.5 py-1 bg-white dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 text-xs font-medium rounded-lg border border-neutral-200 dark:border-neutral-600"
-                      >
-                        {cat.name}
-                        {cat._count?.products !== undefined && (
-                          <span className="ml-1.5 text-neutral-400 dark:text-neutral-500">({cat._count.products})</span>
-                        )}
-                      </span>
+                      editingCategoryId === cat.id ? (
+                        <span key={cat.id} className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={editingCategoryName}
+                            onChange={e => setEditingCategoryName(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' && !isSavingCategory) handleSaveCategory(cat.id);
+                              if (e.key === 'Escape') setEditingCategoryId(null);
+                            }}
+                            className="px-2 py-1 text-xs border border-sky-400 rounded-lg bg-white dark:bg-neutral-800 text-neutral-800 dark:text-white w-32 focus:outline-none focus:ring-1 focus:ring-sky-400"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => handleSaveCategory(cat.id)}
+                            disabled={isSavingCategory}
+                            className="p-1 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded transition-colors disabled:opacity-50"
+                            title="Save"
+                          >
+                            {isSavingCategory ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                          </button>
+                          <button
+                            onClick={() => setEditingCategoryId(null)}
+                            className="p-1 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition-colors"
+                            title="Cancel"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ) : (
+                        <span
+                          key={cat.id}
+                          className="flex items-center gap-1 pl-2.5 pr-1 py-1 bg-white dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 text-xs font-medium rounded-lg border border-neutral-200 dark:border-neutral-600"
+                        >
+                          {cat.name}
+                          {cat._count?.products !== undefined && (
+                            <span className="ml-1 text-neutral-400 dark:text-neutral-500">({cat._count.products})</span>
+                          )}
+                          <button
+                            onClick={() => handleEditCategoryClick(cat)}
+                            className="ml-0.5 p-0.5 text-neutral-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded transition-colors"
+                            title="Rename category"
+                          >
+                            <Edit2 className="w-2.5 h-2.5" />
+                          </button>
+                        </span>
+                      )
                     ))}
                   </div>
                 </div>
@@ -1054,6 +1238,140 @@ const Inventory: React.FC = () => {
                   <>
                     <Plus className="w-4 h-4" /> Create Category
                   </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Subcategory Modal */}
+      {isSubcategoryModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-neutral-900 rounded-lg max-w-md w-full shadow-xl border border-neutral-200 dark:border-neutral-800 animate-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-neutral-200 dark:border-neutral-800 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center shadow-sm">
+                  <Plus className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-neutral-800 dark:text-white">Subcategory</h3>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">Create a new subcategory</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setIsSubcategoryModalOpen(false); setNewSubcategoryName(''); setNewSubcategoryCategoryId(''); }}
+                className="p-2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">
+                  Parent Category <span className="text-rose-500">*</span>
+                </label>
+                <Dropdown
+                  options={categories.map(c => ({ value: c.id, label: c.name }))}
+                  value={newSubcategoryCategoryId}
+                  onChange={(val) => setNewSubcategoryCategoryId(val)}
+                  placeholder="Select a category"
+                  size="md"
+                  buttonClassName="rounded-xl py-3"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">
+                  Subcategory Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newSubcategoryName}
+                  onChange={(e) => setNewSubcategoryName(e.target.value)}
+                  placeholder="e.g., Laptops, Shirts, Beverages..."
+                  className="w-full px-4 py-3 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-sm text-neutral-900 dark:text-white placeholder:text-neutral-400"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !isCreatingSubcategory) handleCreateSubcategory();
+                  }}
+                />
+              </div>
+              {newSubcategoryCategoryId && (
+                <div>
+                  <label className="block text-xs font-bold text-neutral-500 dark:text-neutral-400 mb-2 uppercase tracking-wider">
+                    Existing Subcategories
+                  </label>
+                  <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-100 dark:border-neutral-700/50">
+                    {subcategories.filter(sc => sc.categoryId === newSubcategoryCategoryId).length === 0 ? (
+                      <span className="text-xs text-neutral-400 dark:text-neutral-500">No subcategories yet</span>
+                    ) : (
+                      subcategories.filter(sc => sc.categoryId === newSubcategoryCategoryId).map(sc => (
+                        editingSubcategoryId === sc.id ? (
+                          <span key={sc.id} className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              value={editingSubcategoryName}
+                              onChange={e => setEditingSubcategoryName(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter' && !isSavingSubcategory) handleSaveSubcategory(sc.id);
+                                if (e.key === 'Escape') setEditingSubcategoryId(null);
+                              }}
+                              className="px-2 py-1 text-xs border border-emerald-400 rounded-lg bg-white dark:bg-neutral-800 text-neutral-800 dark:text-white w-32 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleSaveSubcategory(sc.id)}
+                              disabled={isSavingSubcategory}
+                              className="p-1 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded transition-colors disabled:opacity-50"
+                              title="Save"
+                            >
+                              {isSavingSubcategory ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                            </button>
+                            <button
+                              onClick={() => setEditingSubcategoryId(null)}
+                              className="p-1 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition-colors"
+                              title="Cancel"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ) : (
+                          <span key={sc.id} className="flex items-center gap-1 pl-2.5 pr-1 py-1 bg-white dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 text-xs font-medium rounded-lg border border-neutral-200 dark:border-neutral-600">
+                            {sc.name}
+                            {sc._count?.products !== undefined && (
+                              <span className="ml-1 text-neutral-400 dark:text-neutral-500">({sc._count.products})</span>
+                            )}
+                            <button
+                              onClick={() => handleEditSubcategoryClick(sc)}
+                              className="ml-0.5 p-0.5 text-neutral-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded transition-colors"
+                              title="Rename subcategory"
+                            >
+                              <Edit2 className="w-2.5 h-2.5" />
+                            </button>
+                          </span>
+                        )
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="p-5 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/80 dark:bg-neutral-900/50 flex justify-end gap-3">
+              <button
+                onClick={() => { setIsSubcategoryModalOpen(false); setNewSubcategoryName(''); setNewSubcategoryCategoryId(''); }}
+                className="px-5 py-2.5 text-neutral-600 dark:text-neutral-400 font-bold uppercase text-xs tracking-wider hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateSubcategory}
+                disabled={isCreatingSubcategory || !newSubcategoryName.trim() || !newSubcategoryCategoryId}
+                className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-all shadow-sm uppercase text-xs tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCreatingSubcategory ? (
+                  <><RefreshCw className="w-4 h-4 animate-spin" /> Creating...</>
+                ) : (
+                  <><Plus className="w-4 h-4" /> Create Subcategory</>
                 )}
               </button>
             </div>
@@ -1183,6 +1501,7 @@ const Inventory: React.FC = () => {
                         </td>
                         <td className="px-4 py-3">
                           <span className={`inline-block px-2 py-1 rounded text-xs font-bold ${
+                            movement.type === 'OPENING_STOCK' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' :
                             movement.type === 'SALE' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
                             movement.type === 'RESTOCK' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
                             movement.type === 'RETURN' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :

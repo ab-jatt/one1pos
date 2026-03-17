@@ -22,12 +22,16 @@ export class TransactionsService {
     }));
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, branchId?: string) {
     const transaction = await this.prisma.transaction.findUnique({
       where: { id },
     });
 
     if (!transaction) {
+      throw new NotFoundException(`Transaction with ID ${id} not found`);
+    }
+
+    if (branchId && transaction.branchId !== branchId) {
       throw new NotFoundException(`Transaction with ID ${id} not found`);
     }
 

@@ -1,11 +1,22 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '../components/ui/Card';
 import { useLanguage } from '../context/LanguageContext';
+import type { Language } from '../context/LanguageContext';
 import { useCurrency, type Currency } from '../context/CurrencyContext';
+import { useToast } from '../context/ToastContext';
+import { AVAILABLE_CURRENCIES, getCurrencyConfig } from '../utils/currencyConfig';
 import { Store, User, CreditCard, Bell, Shield, Smartphone, Save, ToggleRight, ToggleLeft, CheckCircle, Monitor, Laptop, Phone, Database, Globe, Users, Edit, X, Plus, Trash2, FileText, BarChart3, Sun, Moon } from 'lucide-react';
 import Dropdown from '../components/ui/Dropdown';
 import { Role, User as UserType } from '../types';
+import { Api } from '../services/api';
+
+interface ManagedUser extends UserType {
+  firstName?: string;
+  lastName?: string;
+  isActive?: boolean;
+  firebaseUid?: string;
+}
 
 // AVAILABLE PERMISSIONS CONSTANT
 const AVAILABLE_PERMISSIONS = [
@@ -27,23 +38,64 @@ const AVAILABLE_PERMISSIONS = [
 const Settings: React.FC = () => {
   const { t, setLanguage } = useLanguage();
   const { currency, setCurrency, formatCurrency } = useCurrency();
+  const { showSuccess, showWarning, showError } = useToast();
+  const hasLocalGeneralEditsRef = useRef(false);
   const [activeTab, setActiveTab] = useState('general');
 
   // --- GENERAL SETTINGS STATE ---
   const [generalSettings, setGeneralSettings] = useState(() => ({
     storeName: localStorage.getItem('storeName') || 'one1pos Cafe - Downtown',
     currency: localStorage.getItem('currency') || 'USD',
-    language: localStorage.getItem('language') || 'en',
+    language: localStorage.getItem('appLanguage') || 'en',
     theme: localStorage.getItem('theme') || 'light',
-    taxRate: localStorage.getItem('taxRate') || '8',
+    taxRate: localStorage.getItem('taxRate') || '0',
     address: localStorage.getItem('storeAddress') || '123 Innovation Blvd, Tech City, TC 90210'
   }));
 
+  // Load authoritative store-scoped settings from backend on mount
+  useEffect(() => {
+    let isCancelled = false;
+
+    Api.settings.get().then((data) => {
+      if (isCancelled) return;
+
+      const backendTaxRate = String(data.taxRate * 100);
+      const shouldApplyFetchedValues = !hasLocalGeneralEditsRef.current;
+
+      if (shouldApplyFetchedValues) {
+        setGeneralSettings(prev => ({
+          ...prev,
+          storeName: data.storeName,
+          currency: data.currency,
+          language: data.language || prev.language,
+          taxRate: backendTaxRate,
+        }));
+
+        setCurrency(data.currency as Currency);
+        setLanguage((data.language || 'en') as Language);
+
+        localStorage.setItem('storeName', data.storeName);
+        localStorage.setItem('currency', data.currency);
+        localStorage.setItem('appLanguage', data.language || 'en');
+        localStorage.setItem('taxRate', backendTaxRate);
+      }
+    }).catch(() => {
+      // Fall back to localStorage value if API is unreachable
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [setCurrency, setLanguage]);
+
   // --- ACCOUNT SETTINGS STATE ---
   const [accountSettings, setAccountSettings] = useState({
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'admin@one1pos.com',
+    id: '',
+    role: '',
+    avatar: '',
+    firstName: '',
+    lastName: '',
+    email: '',
     currentPassword: '',
     newPassword: ''
   });
@@ -77,22 +129,45 @@ const Settings: React.FC = () => {
   ]);
 
   // --- USERS STATE ---
-  const [usersList, setUsersList] = useState<UserType[]>([
-    { id: '1', name: 'John Admin', email: 'admin@one1pos.com', role: Role.OWNER, permissions: ['inventory.view', 'inventory.manage', 'inventory.delete', 'pos.operate', 'pos.refund', 'customers.view', 'customers.manage', 'suppliers.view', 'suppliers.manage', 'reports.view', 'financials.view', 'settings.manage', 'users.manage'] },
-    { id: '2', name: 'Sarah Manager', email: 'manager@one1pos.com', role: Role.MANAGER, permissions: ['inventory.view', 'inventory.manage', 'pos.operate', 'pos.refund', 'customers.view', 'customers.manage', 'suppliers.view', 'suppliers.manage', 'reports.view'] },
-    { id: '3', name: 'Kyle Cashier', email: 'cashier@one1pos.com', role: Role.CASHIER, permissions: ['pos.operate', 'customers.view', 'inventory.view'] },
-  ]);
+  const [usersList, setUsersList] = useState<ManagedUser[]>([]);
 
   // Modal States
-  const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
+  const [selectedUser, setSelectedUser] = useState<ManagedUser | null>(null);
   const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false);
   
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
   const [newUser, setNewUser] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
+    password: '',
     role: Role.CASHIER
   });
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const [users, me] = await Promise.all([Api.users.getAll(), Api.users.getMe()]);
+        setUsersList(users as ManagedUser[]);
+
+        const firstName = me.firstName || me.name?.split(' ')[0] || '';
+        const lastName = me.lastName || me.name?.split(' ').slice(1).join(' ') || '';
+        setAccountSettings(prev => ({
+          ...prev,
+          id: me.id,
+          role: me.role,
+          avatar: me.avatar || '',
+          firstName,
+          lastName,
+          email: me.email,
+        }));
+      } catch {
+        showError('Failed to load user settings');
+      }
+    };
+
+    loadUsers();
+  }, [showError]);
 
   // Invoice & Report Template State - Load from localStorage
   const [selectedInvoiceTemplate, setSelectedInvoiceTemplate] = useState(() => {
@@ -116,14 +191,15 @@ const Settings: React.FC = () => {
   // --- HANDLERS ---
 
   const handleGeneralChange = (field: string, value: string) => {
+    hasLocalGeneralEditsRef.current = true;
     setGeneralSettings(prev => ({ ...prev, [field]: value }));
     if (field === 'currency') {
       setCurrency(value as Currency);
       localStorage.setItem('currency', value);
     }
     if (field === 'language') {
-      setLanguage(value as 'en' | 'es' | 'ru' | 'de');
-      localStorage.setItem('language', value);
+      setLanguage(value as Language);
+      localStorage.setItem('appLanguage', value);
     }
     if (field === 'theme') {
       localStorage.setItem('theme', value);
@@ -140,20 +216,69 @@ const Settings: React.FC = () => {
     setAccountSettings(prev => ({ ...prev, [field]: value }));
   };
 
-  const saveGeneralSettings = () => {
-    localStorage.setItem('storeName', generalSettings.storeName);
+  const saveGeneralSettings = async () => {
+    // Persist tax rate and store name to backend first (store-scoped via JWT)
+    const taxRateDecimal = parseFloat(generalSettings.taxRate || '0') / 100;
+
+    try {
+      const saved = await Api.settings.update({
+        taxRate: isNaN(taxRateDecimal) ? 0 : taxRateDecimal,
+        currency: generalSettings.currency,
+        language: generalSettings.language,
+        storeName: generalSettings.storeName,
+      });
+
+      const persistedTaxRate = String(Number(saved.taxRate) * 100);
+      hasLocalGeneralEditsRef.current = false;
+      setGeneralSettings(prev => ({
+        ...prev,
+        storeName: saved.storeName,
+        currency: saved.currency,
+        language: saved.language,
+        taxRate: persistedTaxRate,
+      }));
+
+      setCurrency(saved.currency as Currency);
+      setLanguage(saved.language as Language);
+
+      localStorage.setItem('storeName', saved.storeName);
+      localStorage.setItem('taxRate', persistedTaxRate);
+      localStorage.setItem('currency', saved.currency);
+      localStorage.setItem('appLanguage', saved.language);
+    } catch (err) {
+      console.error('Failed to save settings to backend:', err);
+      showError('Failed to save store settings. Please try again.');
+      return;
+    }
+
     localStorage.setItem('storeAddress', generalSettings.address);
-    localStorage.setItem('taxRate', generalSettings.taxRate);
-    localStorage.setItem('currency', generalSettings.currency);
-    localStorage.setItem('language', generalSettings.language);
     localStorage.setItem('theme', generalSettings.theme);
     window.dispatchEvent(new Event('storage'));
-    alert(t('generalSettingsUpdated'));
+    window.dispatchEvent(new Event('store-settings-updated'));
+
+    showSuccess(t('generalSettingsUpdated'));
   };
 
   const saveAccountSettings = () => {
-    alert(t('profileUpdated'));
-    setAccountSettings(prev => ({...prev, currentPassword: '', newPassword: ''}));
+    const update = async () => {
+      try {
+        await Api.users.updateProfile({
+          firstName: accountSettings.firstName,
+          lastName: accountSettings.lastName,
+        });
+
+        if (accountSettings.newPassword) {
+          await Api.users.changeMyPassword(accountSettings.newPassword);
+        }
+
+        setAccountSettings(prev => ({ ...prev, currentPassword: '', newPassword: '' }));
+        showSuccess(t('profileUpdated'));
+      } catch (err: any) {
+        showError(err.response?.data?.message || 'Failed to update account settings');
+      }
+    };
+
+    update();
   };
 
   const togglePaymentMethod = (id: number) => {
@@ -178,32 +303,57 @@ const Settings: React.FC = () => {
 
   // User Management Handlers
   const handleAddUser = () => {
-    if (!newUser.name || !newUser.email) {
-        alert('Please fill in all fields');
+    if (!newUser.firstName || !newUser.lastName || !newUser.email || !newUser.password) {
+        showWarning('Please fill in all fields');
         return;
     }
 
-    const user: UserType = {
-        id: Math.random().toString(36).substr(2, 9),
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
-        permissions: [] // Default empty, admin can assign later
+    const normalizedEmail = newUser.email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+        showWarning('Please enter a valid email address (example: cashier@storea.com)');
+        return;
+    }
+
+    const createUser = async () => {
+      try {
+        const created = await Api.users.create({
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          email: normalizedEmail,
+          password: newUser.password,
+          role: newUser.role,
+        });
+
+        setUsersList(prev => [created as ManagedUser, ...prev]);
+        setIsAddUserModalOpen(false);
+        setNewUser({ firstName: '', lastName: '', email: '', password: '', role: Role.CASHIER });
+        showSuccess('User added successfully.');
+      } catch (err: any) {
+        showError(err.response?.data?.message || 'Failed to create user');
+      }
     };
 
-    setUsersList([...usersList, user]);
-    setIsAddUserModalOpen(false);
-    setNewUser({ name: '', email: '', role: Role.CASHIER });
-    alert('User added successfully. Please configure permissions.');
+    createUser();
   };
 
   const handleDeleteUser = (userId: string) => {
     if (confirm('Are you sure you want to remove this user? Access will be revoked immediately.')) {
-        setUsersList(prev => prev.filter(u => u.id !== userId));
+        const deactivate = async () => {
+          try {
+            await Api.users.deactivate(userId);
+            setUsersList(prev => prev.map(u => (u.id === userId ? { ...u, isActive: false } : u)));
+            showSuccess('User deactivated successfully.');
+          } catch (err: any) {
+            showError(err.response?.data?.message || 'Failed to deactivate user');
+          }
+        };
+
+        deactivate();
     }
   };
 
-  const openPermissionModal = (user: UserType) => {
+  const openPermissionModal = (user: ManagedUser) => {
     setSelectedUser({ ...user });
     setIsPermissionModalOpen(true);
   };
@@ -225,7 +375,7 @@ const Settings: React.FC = () => {
     setUsersList(prev => prev.map(u => u.id === selectedUser.id ? selectedUser : u));
     setIsPermissionModalOpen(false);
     setSelectedUser(null);
-    alert('Access permissions updated.');
+    showSuccess('Access permissions updated.');
   };
 
   const tabs = [
@@ -304,12 +454,10 @@ const Settings: React.FC = () => {
                      <div className="relative group">
                         <label className="block text-xs font-bold text-neutral-500 dark:text-neutral-400 mb-1.5 uppercase tracking-wider">{t('currency')}</label>
                         <Dropdown
-                          options={[
-                            { value: 'USD', label: 'USD ($)' },
-                            { value: 'EUR', label: 'EUR (€)' },
-                            { value: 'RUB', label: 'RUB (₽)' },
-                            { value: 'PKR', label: 'PKR (₨)' },
-                          ]}
+                          options={AVAILABLE_CURRENCIES.map((c) => ({
+                            value: c.currencyCode,
+                            label: `${c.currencyCode} (${c.currencySymbol})`,
+                          }))}
                           value={generalSettings.currency}
                           onChange={(val) => handleGeneralChange('currency', val)}
                           size="md"
@@ -324,6 +472,8 @@ const Settings: React.FC = () => {
                             { value: 'es', label: '🇪🇸 Español' },
                             { value: 'ru', label: '🇷🇺 Русский' },
                             { value: 'de', label: '🇩🇪 Deutsch' },
+                            { value: 'ur', label: '🇵🇰 اردو' },
+                            { value: 'ar', label: '🇸🇦 العربية' },
                           ]}
                           value={generalSettings.language}
                           onChange={(val) => handleGeneralChange('language', val)}
@@ -331,6 +481,10 @@ const Settings: React.FC = () => {
                           buttonClassName="rounded-xl py-3"
                         />
                      </div>
+                  </div>
+
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                    Active symbol is derived automatically from selected currency: {getCurrencyConfig(generalSettings.currency).currencySymbol}
                   </div>
 
                   <div>
@@ -402,12 +556,12 @@ const Settings: React.FC = () => {
               <div className="space-y-6 max-w-3xl animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="flex items-center gap-6 mb-8 bg-neutral-50 dark:bg-neutral-900 p-4 rounded-lg border border-neutral-200 dark:border-neutral-800">
                   <div className="w-20 h-20 bg-neutral-800 dark:bg-neutral-700 rounded-lg flex items-center justify-center text-white text-2xl font-bold shadow-sm">
-                    {accountSettings.firstName.charAt(0)}{accountSettings.lastName.charAt(0)}
+                    {(accountSettings.avatar || `${accountSettings.firstName.charAt(0)}${accountSettings.lastName.charAt(0)}` || 'U').toString().slice(0, 2).toUpperCase()}
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-neutral-800 dark:text-white">{accountSettings.firstName} {accountSettings.lastName}</h3>
-                    <p className="text-neutral-500 dark:text-neutral-400 font-mono text-xs mt-1">ID: ADMIN-001</p>
-                    <p className="text-sky-600 dark:text-sky-400 text-sm font-medium mt-1">{t('storeManager')}</p>
+                    <p className="text-neutral-500 dark:text-neutral-400 font-mono text-xs mt-1">ID: {accountSettings.id || '-'}</p>
+                    <p className="text-sky-600 dark:text-sky-400 text-sm font-medium mt-1">{accountSettings.role || '-'}</p>
                   </div>
                   <button className="ml-auto px-4 py-2 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl text-sm font-medium hover:border-sky-500 transition-all">{t('changeAvatar')}</button>
                 </div>
@@ -438,7 +592,7 @@ const Settings: React.FC = () => {
                     <input 
                         type="email" 
                         value={accountSettings.email}
-                        onChange={(e) => handleAccountChange('email', e.target.value)}
+                      readOnly
                         className="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-900/50 border border-gray-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 text-neutral-900 dark:text-white transition-all font-mono" 
                     />
                   </div>
@@ -651,6 +805,9 @@ const Settings: React.FC = () => {
                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
                                       {user.role}
                                    </span>
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${user.isActive === false ? 'bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400' : 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400'}`}>
+                                    {user.isActive === false ? 'Inactive' : 'Active'}
+                                  </span>
                                 </div>
                              </div>
                           </div>
@@ -662,7 +819,7 @@ const Settings: React.FC = () => {
                             >
                                 <Edit className="w-4 h-4" /> {t('access')}
                             </button>
-                            {user.role !== Role.OWNER && (
+                            {user.role !== Role.OWNER && user.isActive !== false && (
                                 <button 
                                     onClick={() => handleDeleteUser(user.id)}
                                     className="p-2 text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
@@ -937,7 +1094,7 @@ const Settings: React.FC = () => {
                     <span className="font-bold text-neutral-700 dark:text-neutral-300">Selected:</span> {selectedInvoiceTemplate.charAt(0).toUpperCase() + selectedInvoiceTemplate.slice(1)} Invoice • {selectedReportTemplate.charAt(0).toUpperCase() + selectedReportTemplate.slice(1)} Report
                   </div>
                   <button 
-                    onClick={() => alert(t('profileUpdated'))}
+                    onClick={() => showSuccess(t('profileUpdated'))}
                     className="flex items-center gap-2 px-6 py-2.5 bg-sky-600 text-white rounded-lg hover:bg-sky-500 shadow-sm transition-all font-bold text-sm tracking-wide uppercase"
                   >
                     <Save className="w-4 h-4" /> {t('saveChanges')}
@@ -1033,12 +1190,23 @@ const Settings: React.FC = () => {
 
               <div className="p-6 bg-white dark:bg-neutral-950 space-y-4">
                  <div>
-                    <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">{t('fullName')}</label>
+                  <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">{t('firstName')}</label>
                     <input 
                         type="text" 
-                        value={newUser.name}
-                        onChange={(e) => setNewUser({...newUser, name: e.target.value})}
-                        placeholder={t('enterEmployeeName')}
+                    value={newUser.firstName}
+                    onChange={(e) => setNewUser({...newUser, firstName: e.target.value})}
+                    placeholder="John"
+                    className="w-full px-4 py-3 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all text-neutral-900 dark:text-white placeholder:text-neutral-500" 
+                  />
+                 </div>
+
+                 <div>
+                  <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">{t('lastName')}</label>
+                  <input 
+                    type="text" 
+                    value={newUser.lastName}
+                    onChange={(e) => setNewUser({...newUser, lastName: e.target.value})}
+                    placeholder="Doe"
                         className="w-full px-4 py-3 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all text-neutral-900 dark:text-white placeholder:text-neutral-500" 
                     />
                  </div>
@@ -1049,7 +1217,18 @@ const Settings: React.FC = () => {
                         type="email" 
                         value={newUser.email}
                         onChange={(e) => setNewUser({...newUser, email: e.target.value})}
-                        placeholder="user@one1pos.com"
+                        placeholder="cashier@storea.com"
+                        className="w-full px-4 py-3 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all text-neutral-900 dark:text-white placeholder:text-neutral-500" 
+                      />
+                     </div>
+
+                     <div>
+                      <label className="block text-xs font-bold text-neutral-500 dark:text-sky-400/80 mb-1.5 uppercase tracking-wider">{t('newPassword')}</label>
+                      <input 
+                        type="password" 
+                        value={newUser.password}
+                        onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                        placeholder="Minimum 8 characters"
                         className="w-full px-4 py-3 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all text-neutral-900 dark:text-white placeholder:text-neutral-500" 
                     />
                  </div>
@@ -1060,7 +1239,7 @@ const Settings: React.FC = () => {
                       options={[
                         { value: Role.CASHIER, label: 'Cashier (Restricted)' },
                         { value: Role.MANAGER, label: 'Manager (Operational)' },
-                        { value: Role.OWNER, label: 'Administrator (Full Access)' },
+                        { value: Role.STAFF, label: 'Staff (Limited Access)' },
                       ]}
                       value={newUser.role}
                       onChange={(val) => setNewUser({...newUser, role: val as Role})}

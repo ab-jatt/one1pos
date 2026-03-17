@@ -4,6 +4,7 @@ import { Card } from '../components/ui/Card';
 import { Api } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { useToast } from '../context/ToastContext';
 import { Employee } from '../types';
 import { Users, Briefcase, DollarSign, UserPlus, MoreVertical, Calendar, Clock, CheckCircle, ChevronLeft, ChevronRight, Filter, Download, AlertCircle, X } from 'lucide-react';
 import Dropdown from '../components/ui/Dropdown';
@@ -52,6 +53,7 @@ const formatWeekLabel = (weekStart: Date): string => {
 const HR: React.FC = () => {
   const { t = (key: string) => key } = useLanguage() || {};
   const { formatMoney = (val: number) => `$${val.toFixed(2)}` } = useCurrency() || {};
+  const { showSuccess, showError, showWarning } = useToast();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [activeTab, setActiveTab] = useState<'directory' | 'shifts' | 'payroll'>('directory');
@@ -74,22 +76,20 @@ const HR: React.FC = () => {
     joinDate: new Date().toISOString().split('T')[0]
   });
 
-  // Mock Payroll History
-  const [payrollHistory, setPayrollHistory] = useState<PayrollRecord[]>([
-    { id: 'PR-2023-10-A', period: 'Oct 1 - Oct 15, 2023', payDate: '2023-10-15', employees: 4, total: 7250.00, status: 'Paid' },
-    { id: 'PR-2023-09-B', period: 'Sep 16 - Sep 30, 2023', payDate: '2023-09-30', employees: 4, total: 7250.00, status: 'Paid' },
-    { id: 'PR-2023-09-A', period: 'Sep 1 - Sep 15, 2023', payDate: '2023-09-15', employees: 4, total: 7250.00, status: 'Paid' },
-  ]);
+  // Payroll History (fetched from API)
+  const [payrollHistory, setPayrollHistory] = useState<PayrollRecord[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [employeesData, shiftsData] = await Promise.all([
+        const [employeesData, shiftsData, payrollData] = await Promise.all([
           Api.hr.getEmployees(),
           Api.hr.getShifts(),
+          Api.hr.getPayrollHistory(),
         ]);
         setEmployees(employeesData);
         setShifts(shiftsData);
+        setPayrollHistory(payrollData);
       } catch (error) {
         console.error('Error fetching data:', error);
       }
@@ -98,28 +98,41 @@ const HR: React.FC = () => {
   }, []);
 
   const handleRunPayroll = async () => {
+    if (employees.length === 0) {
+      showWarning(t('noEmployeesForPayroll') || 'No employees to process payroll for');
+      return;
+    }
     if (confirm(t('confirmPayroll'))) {
+      try {
         setIsPayrollRunning(true);
-        await Api.hr.runPayroll();
+        const result = await Api.hr.runPayroll();
         
-        // Mock adding new payroll record
-        const newRecord: PayrollRecord = {
-            id: `PR-${Date.now()}`,
-            period: 'Oct 16 - Oct 31, 2023',
-            payDate: new Date().toISOString().split('T')[0],
-            employees: employees.length,
-            total: employees.reduce((acc, emp) => acc + (emp.salary / 24), 0), // Approx half-month salary
-            status: 'Paid'
-        };
-        
-        setPayrollHistory([newRecord, ...payrollHistory]);
+        if (result.success) {
+          const newRecord: PayrollRecord = {
+            id: result.id,
+            period: result.period,
+            payDate: result.payDate,
+            employees: result.employees,
+            total: result.total,
+            status: result.status || 'Paid',
+          };
+          setPayrollHistory([newRecord, ...payrollHistory]);
+          showSuccess(t('payrollProcessed') || 'Payroll processed successfully');
+        } else {
+          showError(result.message || t('payrollFailed') || 'Failed to process payroll');
+        }
+      } catch (error) {
+        console.error('Error running payroll:', error);
+        showError(t('payrollFailed') || 'Failed to process payroll');
+      } finally {
         setIsPayrollRunning(false);
+      }
     }
   };
 
   const handleCreateShift = async () => {
     if (!newShift.employeeId || !newShift.date || !newShift.startTime || !newShift.endTime) {
-      alert(t('fillAllFields'));
+      showWarning(t('fillAllFields'));
       return;
     }
 
@@ -139,22 +152,23 @@ const HR: React.FC = () => {
       setShifts([...shifts, createdShift]);
       setIsShiftModalOpen(false);
       setNewShift({ employeeId: '', date: '', startTime: '', endTime: '', type: 'Morning' });
+      showSuccess(t('shiftCreated') || 'Shift created successfully');
     } catch (error) {
       console.error('Error creating shift:', error);
-      alert(t('failedCreateShift'));
+      showError(t('failedCreateShift'));
     }
   };
 
   const handleCreateEmployee = async () => {
     if (!newEmployee.name || !newEmployee.email || !newEmployee.role || !newEmployee.department || !newEmployee.salary) {
-      alert(t('fillRequiredFields'));
+      showWarning(t('fillRequiredFields'));
       return;
     }
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(newEmployee.email)) {
-      alert(t('invalidEmail'));
+      showWarning(t('invalidEmail'));
       return;
     }
 
@@ -172,9 +186,10 @@ const HR: React.FC = () => {
         status: 'Active',
         joinDate: new Date().toISOString().split('T')[0]
       });
+      showSuccess(t('employeeCreated') || 'Employee registered successfully');
     } catch (error) {
       console.error('Error creating employee:', error);
-      alert(t('failedCreateEmployee'));
+      showError(t('failedCreateEmployee'));
     } finally {
       setIsCreatingEmployee(false);
     }
@@ -252,7 +267,7 @@ const HR: React.FC = () => {
                 <div className="p-5 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 relative overflow-hidden group hover:shadow-md transition-shadow">
                    <div className="relative z-10">
                       <p className="text-xs font-mono text-neutral-500 uppercase tracking-widest mb-1">{t('activeNow')}</p>
-                      <h3 className="text-3xl font-bold text-neutral-800 dark:text-white">3</h3>
+                      <h3 className="text-3xl font-bold text-neutral-800 dark:text-white">{employees.filter(e => e.status === 'Active').length}</h3>
                    </div>
                    <div className="absolute top-0 right-0 p-4 opacity-5"><Briefcase className="w-12 h-12 text-neutral-400" /></div>
                    <div className="absolute bottom-0 left-0 w-full h-1 bg-emerald-500"></div>
@@ -261,7 +276,7 @@ const HR: React.FC = () => {
                 <div className="p-5 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 relative overflow-hidden group hover:shadow-md transition-shadow">
                    <div className="relative z-10">
                       <p className="text-xs font-mono text-neutral-500 uppercase tracking-widest mb-1">{t('onLeave')}</p>
-                      <h3 className="text-3xl font-bold text-neutral-800 dark:text-white">1</h3>
+                      <h3 className="text-3xl font-bold text-neutral-800 dark:text-white">{employees.filter(e => e.status === 'On Leave').length}</h3>
                    </div>
                    <div className="absolute top-0 right-0 p-4 opacity-5"><Calendar className="w-12 h-12 text-neutral-400" /></div>
                    <div className="absolute bottom-0 left-0 w-full h-1 bg-amber-500"></div>
@@ -445,7 +460,14 @@ const HR: React.FC = () => {
                            <div className="flex justify-between items-start mb-6">
                               <div>
                                  <p className="text-sky-100 font-medium mb-1 text-sm uppercase tracking-wider">{t('nextPayrollRun')}</p>
-                                 <h3 className="text-3xl font-bold font-mono">Oct 31, 2023</h3>
+                                 <h3 className="text-3xl font-bold font-mono">{(() => {
+                                   const now = new Date();
+                                   const day = now.getDate();
+                                   const nextDate = day <= 15
+                                     ? new Date(now.getFullYear(), now.getMonth(), 15)
+                                     : new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                                   return nextDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                                 })()}</h3>
                               </div>
                               <div className="p-2 bg-white/10 rounded-lg">
                                  <Calendar className="w-6 h-6 text-white" />

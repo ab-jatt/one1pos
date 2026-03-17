@@ -11,13 +11,13 @@ export class WarehousesController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.warehousesService.findOne(id);
+  findOne(@Param('id') id: string, @Req() req: any) {
+    return this.warehousesService.findOne(id, req.user.branchId);
   }
 
   @Get(':id/stock')
-  getStockBalances(@Param('id') id: string) {
-    return this.warehousesService.getStockBalances(id);
+  getStockBalances(@Param('id') id: string, @Req() req: any) {
+    return this.warehousesService.getStockBalances(id, req.user.branchId);
   }
 
   @Post()
@@ -26,17 +26,17 @@ export class WarehousesController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: any) {
-    return this.warehousesService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
+    return this.warehousesService.update(id, dto, req.user.branchId);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.warehousesService.remove(id);
+  remove(@Param('id') id: string, @Req() req: any) {
+    return this.warehousesService.remove(id, req.user.branchId);
   }
 
   @Post(':id/locations')
-  addLocation(@Param('id') id: string, @Body() dto: any) {
-    return this.warehousesService.addLocation(id, dto);
+  addLocation(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
+    return this.warehousesService.addLocation(id, dto, req.user.branchId);
   }
 }

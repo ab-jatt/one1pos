@@ -102,7 +102,7 @@ export class DashboardService {
 
     // ── Receivable (customer balances > 0 = they owe us) ────────
     const receivable = await this.prisma.customer.aggregate({
-      where: { balance: { gt: 0 }, deletedAt: null },
+      where: { branchId, balance: { gt: 0 }, deletedAt: null },
       _sum: { balance: true },
       _count: true,
     });
